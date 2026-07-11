@@ -10,7 +10,12 @@ pub fn rocket_app(db_path: &str) -> Rocket<Build> {
     .manage(db)
     .mount(
       "/",
-      rocket::routes![routes::create_link, routes::follow_link, routes::qr_svg],
+      rocket::routes![
+        routes::create_link,
+        routes::follow_link,
+        routes::qr_svg,
+        routes::valid_url
+      ],
     )
     .mount("/", FileServer::from(relative!("static")))
     .register("/", rocket::catchers![routes::default_catcher])

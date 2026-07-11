@@ -111,3 +111,36 @@ fn create_link_rejects_non_http_scheme() {
     .dispatch();
   assert_eq!(res.status(), Status::BadRequest);
 }
+
+#[test]
+fn valid_endpoint_accepts_good_url() {
+  let client = client();
+  let res = client
+    .post("/api/valid")
+    .header(ContentType::JSON)
+    .body(r#"{"url": "https://example.com/ok"}"#)
+    .dispatch();
+  assert_eq!(res.status(), Status::Ok);
+  let body: serde_json::Value = res.into_json().expect("json body");
+  assert_eq!(body["valid"], true);
+  assert!(body.get("error").is_none() || body["error"].is_null());
+}
+
+#[test]
+fn valid_endpoint_rejects_bad_url() {
+  let client = client();
+  for bad in [
+    r#"{"url": "not a url"}"#,
+    r#"{"url": "ftp://example.com/f"}"#,
+  ] {
+    let res = client
+      .post("/api/valid")
+      .header(ContentType::JSON)
+      .body(bad)
+      .dispatch();
+    assert_eq!(res.status(), Status::Ok);
+    let body: serde_json::Value = res.into_json().expect("json body");
+    assert_eq!(body["valid"], false);
+    assert!(!body["error"].as_str().expect("error message").is_empty());
+  }
+}

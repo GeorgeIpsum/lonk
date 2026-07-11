@@ -45,6 +45,14 @@ pub struct LinkResp {
   qr_url: String,
 }
 
+#[derive(Serialize)]
+#[serde(crate = "rocket::serde")]
+pub struct ValidResp {
+  valid: bool,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  error: Option<String>,
+}
+
 #[rocket::post("/api/links", data = "<body>")]
 pub fn create_link(
   db: &State<Db>,
@@ -94,6 +102,20 @@ pub fn qr_svg(
     .map_err(|_| api_error(Status::InternalServerError, "qr encoding failed"))?;
   let image = code.render::<svg::Color>().min_dimensions(256, 256).build();
   Ok((ContentType::SVG, image))
+}
+
+#[rocket::post("/api/valid", data = "<body>")]
+pub fn valid_url(body: Json<CreateReq>) -> Json<ValidResp> {
+  match lonk_validate::validate_url(&body.url) {
+    Ok(_) => Json(ValidResp {
+      valid: true,
+      error: None,
+    }),
+    Err(e) => Json(ValidResp {
+      valid: false,
+      error: Some(e.to_string()),
+    }),
+  }
 }
 
 /// "https" when a proxy says so via X-Forwarded-Proto, else "http".
