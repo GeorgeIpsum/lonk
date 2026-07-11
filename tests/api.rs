@@ -1,4 +1,4 @@
-use rocket::http::{ContentType, Status};
+use rocket::http::{ContentType, Header, Status};
 use rocket::local::blocking::Client;
 
 fn client() -> Client {
@@ -61,6 +61,34 @@ fn redirect_unknown_id_is_404() {
   assert_eq!(res.status(), Status::NotFound);
   let body: serde_json::Value = res.into_json().expect("json body");
   assert!(body["error"].as_str().is_some());
+}
+
+#[test]
+fn qr_returns_svg_for_known_id() {
+  let client = client();
+  let res = client
+    .post("/api/links")
+    .header(ContentType::JSON)
+    .body(r#"{"url": "https://example.com/qr-me"}"#)
+    .dispatch();
+  let body: serde_json::Value = res.into_json().expect("json body");
+  let qr_url = body["qr_url"].as_str().unwrap().to_string();
+
+  let res = client
+    .get(&qr_url)
+    .header(Header::new("Host", "lonk.example"))
+    .dispatch();
+  assert_eq!(res.status(), Status::Ok);
+  assert_eq!(res.content_type(), Some(ContentType::SVG));
+  let svg = res.into_string().expect("svg body");
+  assert!(svg.contains("<svg"));
+}
+
+#[test]
+fn qr_unknown_id_is_404() {
+  let client = client();
+  let res = client.get("/zzzzzzz/qr").dispatch();
+  assert_eq!(res.status(), Status::NotFound);
 }
 
 #[test]
