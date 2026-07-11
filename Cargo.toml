@@ -7,7 +7,6 @@ edition = "2021"
 rocket = { version = "0.5.1", features = ["json"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
-url = "2"
 rand = "0.8"
 lonk-validate = { path = "crates/lonk-validate" }
 
