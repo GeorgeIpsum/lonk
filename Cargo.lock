@@ -711,11 +711,19 @@ checksum = "13dc2df351e3202783a1fe0d44375f7295ffb4049267b0f3018346dc122a1d94"
 name = "lonk"
 version = "0.1.0"
 dependencies = [
+ "lonk-validate",
  "qrcode",
  "rand",
  "rocket",
  "rusqlite",
  "serde_json",
+ "url",
+]
+
+[[package]]
+name = "lonk-validate"
+version = "0.1.0"
+dependencies = [
  "url",
 ]
 
