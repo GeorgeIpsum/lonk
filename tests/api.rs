@@ -92,6 +92,16 @@ fn qr_unknown_id_is_404() {
 }
 
 #[test]
+fn index_serves_create_form() {
+  let client = client();
+  let res = client.get("/").dispatch();
+  assert_eq!(res.status(), Status::Ok);
+  assert_eq!(res.content_type(), Some(ContentType::HTML));
+  let html = res.into_string().expect("html body");
+  assert!(html.contains("id=\"url\""));
+}
+
+#[test]
 fn create_link_rejects_non_http_scheme() {
   let client = client();
   let res = client

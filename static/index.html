@@ -1,4 +1,71 @@
 <!DOCTYPE html>
 <html lang="en">
-  asdf
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>lonk</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem; }
+    form { display: flex; gap: 0.5rem; }
+    input[type="url"] { flex: 1; padding: 0.5rem; font-size: 1rem; }
+    button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; }
+    #result { margin-top: 2rem; }
+    #result a { font-size: 1.25rem; word-break: break-all; }
+    #qr { display: block; margin-top: 1rem; }
+    #error { color: #b00020; }
+    [hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <h1>lonk</h1>
+  <p>Paste a long URL, get a short one — with a QR code.</p>
+  <form id="form">
+    <input type="url" id="url" placeholder="https://example.com/very/long/url" required>
+    <button type="submit">Shorten</button>
+  </form>
+  <p id="error" role="alert" hidden></p>
+  <section id="result" hidden>
+    <a id="short" href=""></a>
+    <button id="copy" type="button">Copy</button>
+    <img id="qr" alt="QR code for the short link" width="256" height="256">
+  </section>
+  <script>
+    const form = document.getElementById('form');
+    const error = document.getElementById('error');
+    const result = document.getElementById('result');
+    const short = document.getElementById('short');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      error.hidden = true;
+      result.hidden = true;
+      let res, data;
+      try {
+        res = await fetch('/api/links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url: document.getElementById('url').value }),
+        });
+        data = await res.json();
+      } catch {
+        error.textContent = 'Request failed — is the server up?';
+        error.hidden = false;
+        return;
+      }
+      if (!res.ok) {
+        error.textContent = data.error || 'Something went wrong.';
+        error.hidden = false;
+        return;
+      }
+      short.href = data.short_url;
+      short.textContent = location.origin + data.short_url;
+      document.getElementById('qr').src = data.qr_url;
+      result.hidden = false;
+    });
+
+    document.getElementById('copy').addEventListener('click', () => {
+      navigator.clipboard.writeText(short.textContent);
+    });
+  </script>
+</body>
 </html>
