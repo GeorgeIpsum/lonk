@@ -1,0 +1,9 @@
+node_modules/
+test-results/
+playwright-report/
+
+# The repo root .gitignore blanket-ignores package.json/package-lock.json
+# (leftover rust-lang/rust boilerplate). Un-ignore them here so this npm
+# project's manifest and lockfile can be committed as intended.
+!package.json
+!package-lock.json
