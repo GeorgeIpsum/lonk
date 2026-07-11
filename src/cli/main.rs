@@ -31,10 +31,7 @@ fn run(cli: Cli) -> i32 {
       run_setup(base_url, profile)
     }
     None if cli.valid => run_valid(&cli.urls),
-    None => {
-      eprintln!("shorten: not implemented yet");
-      EXIT_USAGE
-    }
+    None => run_shorten(&cli),
   }
 }
 
@@ -114,4 +111,108 @@ fn prompt_base_url() -> Option<String> {
   } else {
     Some(line)
   }
+}
+
+fn run_shorten(cli: &Cli) -> i32 {
+  // 1. local validation, fail fast before any network traffic
+  for url in &cli.urls {
+    if let Err(e) = lonk_validate::validate_url(url) {
+      eprintln!("{url}: {e}");
+      return EXIT_USAGE;
+    }
+  }
+  if cli.qr_svg && cli.urls.len() != 1 {
+    eprintln!("--qr-svg requires exactly one URL");
+    return EXIT_USAGE;
+  }
+
+  // 2. resolve base url from profile
+  let base = match resolve_base_url(cli.profile.as_deref()) {
+    Ok(b) => b,
+    Err(code) => return code,
+  };
+
+  // 3. shorten in input order, fail fast
+  for (i, url) in cli.urls.iter().enumerate() {
+    match shorten_one(&base, url) {
+      Ok(short) => {
+        if i > 0 && cli.qr {
+          println!();
+        }
+        emit(&short, cli);
+      }
+      Err((code, msg)) => {
+        eprintln!("{url}: {msg}");
+        return code;
+      }
+    }
+  }
+  EXIT_OK
+}
+
+/// Resolve the profile's base url; Err carries the exit code (already reported).
+fn resolve_base_url(profile: Option<&str>) -> Result<String, i32> {
+  let path = config::config_path();
+  let mut cfg = config::Config::load(&path).map_err(|e| {
+    eprintln!("{e}");
+    EXIT_USAGE
+  })?;
+  let name = profile.unwrap_or("default");
+  if let Some(base) = cfg.base_url(name) {
+    return Ok(base.to_string());
+  }
+  if profile.is_some() {
+    eprintln!("profile '{name}' not found; run: lonk setup --profile {name} <base-url>");
+    return Err(EXIT_USAGE);
+  }
+  // default profile missing: one-time interactive setup on a TTY
+  match prompt_base_url().and_then(|raw| lonk_validate::validate_url(raw.trim()).ok()) {
+    Some(parsed) => {
+      let base = parsed.as_str().trim_end_matches('/').to_string();
+      cfg.profiles.insert(
+        "default".into(),
+        config::Profile {
+          base_url: base.clone(),
+        },
+      );
+      cfg.save(&path).map_err(|e| {
+        eprintln!("{e}");
+        EXIT_USAGE
+      })?;
+      Ok(base)
+    }
+    None => {
+      eprintln!("no server configured; run: lonk setup <base-url>");
+      Err(EXIT_USAGE)
+    }
+  }
+}
+
+/// POST one url; Ok(full short url), Err((exit code, message)).
+fn shorten_one(base: &str, url: &str) -> Result<String, (i32, String)> {
+  let resp = ureq::post(&format!("{base}/api/links"))
+    .send_json(serde_json::json!({ "url": url }))
+    .map_err(|e| match e {
+      ureq::Error::Status(code, resp) => {
+        let msg = resp
+          .into_json::<serde_json::Value>()
+          .ok()
+          .and_then(|v| v["error"].as_str().map(String::from))
+          .unwrap_or_else(|| format!("server returned {code}"));
+        (EXIT_NETWORK, msg)
+      }
+      ureq::Error::Transport(t) => (EXIT_NETWORK, t.to_string()),
+    })?;
+  let body: serde_json::Value = resp
+    .into_json()
+    .map_err(|e| (EXIT_NETWORK, format!("bad response: {e}")))?;
+  let short_path = body["short_url"]
+    .as_str()
+    .ok_or((EXIT_NETWORK, "response missing short_url".to_string()))?;
+  Ok(format!("{base}{short_path}"))
+}
+
+/// Print one result. Task 9 extends this with --qr / --qr-svg rendering.
+fn emit(short: &str, _cli: &Cli) {
+  println!("{short}");
 }
