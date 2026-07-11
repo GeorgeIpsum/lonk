@@ -1,4 +1,6 @@
 mod args;
+#[allow(dead_code)]
+mod config;
 
 use args::{Cli, Cmd};
 use clap::Parser;
