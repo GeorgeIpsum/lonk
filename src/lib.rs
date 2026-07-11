@@ -1,4 +1,5 @@
 pub mod db;
+pub mod paths;
 pub mod routes;
 
 use rocket::fs::{relative, FileServer};

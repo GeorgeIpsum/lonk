@@ -3,6 +3,10 @@ name = "lonk"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "lonkd"
+path = "src/main.rs"
+
 [dependencies]
 rocket = { version = "0.5.1", features = ["json"] }
 rusqlite = { version = "0.31", features = ["bundled"] }
