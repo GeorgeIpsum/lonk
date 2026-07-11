@@ -1,5 +1,5 @@
 use rocket::http::Status;
-use rocket::response::status;
+use rocket::response::{status, Redirect};
 use rocket::serde::json::Json;
 use rocket::serde::{Deserialize, Serialize};
 use rocket::State;
@@ -72,6 +72,14 @@ pub fn create_link(
     Status::InternalServerError,
     "could not allocate a unique id",
   ))
+}
+
+#[rocket::get("/<id>")]
+pub fn follow_link(db: &State<Db>, id: &str) -> Result<Redirect, ApiError> {
+  match db.get_url(id).map_err(db_error)? {
+    Some(url) => Ok(Redirect::to(url)),
+    None => Err(api_error(Status::NotFound, "no such link")),
+  }
 }
 
 #[rocket::catch(default)]

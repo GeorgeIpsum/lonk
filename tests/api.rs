@@ -36,6 +36,34 @@ fn create_link_rejects_unparseable_url() {
 }
 
 #[test]
+fn redirect_round_trip() {
+  let client = client();
+  let res = client
+    .post("/api/links")
+    .header(ContentType::JSON)
+    .body(r#"{"url": "https://example.com/target"}"#)
+    .dispatch();
+  let body: serde_json::Value = res.into_json().expect("json body");
+  let short_url = body["short_url"].as_str().unwrap().to_string();
+
+  let res = client.get(&short_url).dispatch();
+  assert_eq!(res.status(), Status::SeeOther);
+  assert_eq!(
+    res.headers().get_one("Location"),
+    Some("https://example.com/target")
+  );
+}
+
+#[test]
+fn redirect_unknown_id_is_404() {
+  let client = client();
+  let res = client.get("/zzzzzzz").dispatch();
+  assert_eq!(res.status(), Status::NotFound);
+  let body: serde_json::Value = res.into_json().expect("json body");
+  assert!(body["error"].as_str().is_some());
+}
+
+#[test]
 fn create_link_rejects_non_http_scheme() {
   let client = client();
   let res = client
