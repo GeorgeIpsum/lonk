@@ -49,6 +49,12 @@ pre-validation in the CLI can never disagree with the server.
 
 ## Server changes
 
+- Default database location: when `LONK_DB` is not set, `lonkd` stores the
+  SQLite database alongside the settings, at `<config-dir>/lonk.db` where
+  `<config-dir>` is the same directory the CLI config resolves to
+  (`$LONK_CONFIG_DIR`, else `$XDG_CONFIG_HOME/lonk`, else `~/.config/lonk`).
+  The directory is created on startup if missing. `LONK_DB` still overrides
+  (tests and e2e rely on this).
 - `routes::create_link` refactors to call `lonk_validate::validate_url`;
   behavior and response shapes are unchanged.
 - New endpoint `POST /api/valid`, body `{"url": "<string>"}`:
