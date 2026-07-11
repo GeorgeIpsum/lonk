@@ -6,7 +6,6 @@ use clap::Parser;
 
 const EXIT_OK: i32 = 0;
 const EXIT_USAGE: i32 = 1;
-#[allow(dead_code)] // used from Task 8 on
 const EXIT_NETWORK: i32 = 2;
 
 fn main() {
@@ -213,6 +212,44 @@ fn shorten_one(base: &str, url: &str) -> Result<String, (i32, String)> {
 }
 
 /// Print one result. Task 9 extends this with --qr / --qr-svg rendering.
-fn emit(short: &str, _cli: &Cli) {
+fn emit(short: &str, cli: &Cli) {
+  if cli.qr_svg {
+    let svg = match qr_svg(short) {
+      Ok(s) => s,
+      Err(e) => {
+        eprintln!("{e}");
+        std::process::exit(EXIT_USAGE);
+      }
+    };
+    eprintln!("{short}");
+    println!("{svg}");
+    return;
+  }
   println!("{short}");
+  if cli.qr {
+    match qr_unicode(short) {
+      Ok(q) => println!("{q}"),
+      Err(e) => {
+        eprintln!("{e}");
+        std::process::exit(EXIT_USAGE);
+      }
+    }
+  }
+}
+
+fn qr_unicode(content: &str) -> Result<String, String> {
+  let code =
+    qrcode::QrCode::new(content.as_bytes()).map_err(|e| format!("qr encoding failed: {e}"))?;
+  Ok(code.render::<qrcode::render::unicode::Dense1x2>().build())
+}
+
+fn qr_svg(content: &str) -> Result<String, String> {
+  let code =
+    qrcode::QrCode::new(content.as_bytes()).map_err(|e| format!("qr encoding failed: {e}"))?;
+  Ok(
+    code
+      .render::<qrcode::render::svg::Color>()
+      .min_dimensions(256, 256)
+      .build(),
+  )
 }

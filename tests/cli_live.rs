@@ -84,6 +84,40 @@ fn shorten_end_to_end() {
   assert_eq!(resp.status(), 303);
   assert_eq!(resp.header("Location"), Some("https://example.com/first"));
 
+  // --qr: link line, then a unicode qr block
+  let out = lonk_with_config(tmp.path())
+    .args(["--qr", "https://example.com/qr"])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(0));
+  let stdout = String::from_utf8_lossy(&out.stdout);
+  assert!(stdout
+    .lines()
+    .next()
+    .unwrap()
+    .starts_with(&format!("{}/", base())));
+  assert!(
+    stdout.contains('\u{2588}'),
+    "no unicode blocks in: {stdout}"
+  ); // █
+
+  // --qr-svg: stdout is exactly an svg document
+  let out = lonk_with_config(tmp.path())
+    .args(["--qr-svg", "https://example.com/qrsvg"])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(0));
+  let stdout = String::from_utf8_lossy(&out.stdout);
+  assert!(stdout.trim_start().starts_with("<?xml") || stdout.trim_start().starts_with("<svg"));
+  assert!(String::from_utf8_lossy(&out.stderr).contains(&format!("{}/", base())));
+
+  // --qr-svg with two urls is a usage error
+  let out = lonk_with_config(tmp.path())
+    .args(["--qr-svg", "https://a.example/1", "https://a.example/2"])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(1));
+
   // fail fast on invalid input: nothing shortened, exit 1
   let out = lonk_with_config(tmp.path())
     .args(["ftp://nope.example", "https://example.com/never-sent"])
