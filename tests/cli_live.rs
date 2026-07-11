@@ -149,6 +149,54 @@ fn shorten_unconfigured_without_tty_hints_setup() {
 }
 
 #[test]
+fn shorten_with_trailing_slash_config_base_url() {
+  let tmp = tempfile::tempdir().unwrap();
+  let _server = start_server(tmp.path());
+
+  // Hand-write a config with a trailing slash on base_url, bypassing
+  // `setup`'s own normalization, so this exercises the read path in
+  // resolve_base_url. If that path didn't trim the slash, the CLI would
+  // POST to "{base}//api/links", which doesn't match lonkd's route and
+  // fails with a network/server error (exit 2) instead of succeeding.
+  std::fs::write(
+    tmp.path().join("config.toml"),
+    format!("[profiles.default]\nbase_url = \"{}/\"\n", base()),
+  )
+  .unwrap();
+
+  let out = lonk_with_config(tmp.path())
+    .arg("https://example.com/trailing-slash-config")
+    .output()
+    .unwrap();
+  assert_eq!(
+    out.status.code(),
+    Some(0),
+    "stderr: {}",
+    String::from_utf8_lossy(&out.stderr)
+  );
+  let stdout = String::from_utf8_lossy(&out.stdout);
+  let short = stdout.trim();
+  assert!(
+    short.starts_with(&format!("{}/", base())) && !short.contains("//api/"),
+    "short url: {short}"
+  );
+
+  // the short link must actually resolve, proving the create request landed
+  // on the real /api/links route rather than a doubled-slash 404.
+  let resp = ureq::AgentBuilder::new()
+    .redirects(0)
+    .build()
+    .get(short)
+    .call()
+    .expect("GET short link");
+  assert_eq!(resp.status(), 303);
+  assert_eq!(
+    resp.header("Location"),
+    Some("https://example.com/trailing-slash-config")
+  );
+}
+
+#[test]
 fn shorten_with_server_down_is_exit_2() {
   let tmp = tempfile::tempdir().unwrap();
   // configure a base url where nothing listens (server NOT started)

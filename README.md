@@ -21,6 +21,31 @@ set `LONK_DB` to override the path.
 | `GET /<id>`       | `303` redirect to the original URL                         |
 | `GET /<id>/qr`    | SVG QR code for the short link                             |
 
+## Upgrading from pre-CLI versions
+
+Two deploy-affecting changes landed alongside the `lonk` CLI:
+
+- The server binary was renamed from `lonk` to `lonkd`. Update whatever
+  starts it (systemd unit, Dockerfile `CMD`, process manager, etc).
+- The default SQLite path moved from `./lonk.db` (the process's current
+  working directory) to `<config-dir>/lonk.db`
+  (`~/.config/lonk/lonk.db` by default). If you relied on the old default
+  and don't set `LONK_DB` explicitly, the next restart will silently open a
+  fresh, empty database instead of your existing one.
+
+  To keep your existing data, either:
+
+  ```bash
+  export LONK_DB=./lonk.db   # keep using the old path
+  ```
+
+  or move the file to the new default location:
+
+  ```bash
+  mkdir -p ~/.config/lonk
+  mv ./lonk.db ~/.config/lonk/lonk.db
+  ```
+
 ## CLI (`lonk`)
 
 One-time setup, then shorten away:

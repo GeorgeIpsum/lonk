@@ -113,6 +113,11 @@ fn prompt_base_url() -> Option<String> {
 }
 
 fn run_shorten(cli: &Cli) -> i32 {
+  if cli.urls.is_empty() {
+    eprintln!("no URL given; usage: lonk [OPTIONS] <URL>...");
+    return EXIT_USAGE;
+  }
+
   // 1. local validation, fail fast before any network traffic
   for url in &cli.urls {
     if let Err(e) = lonk_validate::validate_url(url) {
@@ -158,28 +163,34 @@ fn resolve_base_url(profile: Option<&str>) -> Result<String, i32> {
   })?;
   let name = profile.unwrap_or("default");
   if let Some(base) = cfg.base_url(name) {
-    return Ok(base.to_string());
+    return Ok(base.trim_end_matches('/').to_string());
   }
   if profile.is_some() {
     eprintln!("profile '{name}' not found; run: lonk setup --profile {name} <base-url>");
     return Err(EXIT_USAGE);
   }
   // default profile missing: one-time interactive setup on a TTY
-  match prompt_base_url().and_then(|raw| lonk_validate::validate_url(raw.trim()).ok()) {
-    Some(parsed) => {
-      let base = parsed.as_str().trim_end_matches('/').to_string();
-      cfg.profiles.insert(
-        "default".into(),
-        config::Profile {
-          base_url: base.clone(),
-        },
-      );
-      cfg.save(&path).map_err(|e| {
+  match prompt_base_url() {
+    Some(raw) => match lonk_validate::validate_url(raw.trim()) {
+      Ok(parsed) => {
+        let base = parsed.as_str().trim_end_matches('/').to_string();
+        cfg.profiles.insert(
+          "default".into(),
+          config::Profile {
+            base_url: base.clone(),
+          },
+        );
+        cfg.save(&path).map_err(|e| {
+          eprintln!("{e}");
+          EXIT_USAGE
+        })?;
+        Ok(base)
+      }
+      Err(e) => {
         eprintln!("{e}");
-        EXIT_USAGE
-      })?;
-      Ok(base)
-    }
+        Err(EXIT_USAGE)
+      }
+    },
     None => {
       eprintln!("no server configured; run: lonk setup <base-url>");
       Err(EXIT_USAGE)
@@ -211,7 +222,8 @@ fn shorten_one(base: &str, url: &str) -> Result<String, (i32, String)> {
   Ok(format!("{base}{short_path}"))
 }
 
-/// Print one result. Task 9 extends this with --qr / --qr-svg rendering.
+/// Print the short url, plus a QR code (unicode to stdout, or SVG to stdout
+/// with the url on stderr) when `--qr`/`--qr-svg` was requested.
 fn emit(short: &str, cli: &Cli) {
   if cli.qr_svg {
     let svg = match qr_svg(short) {

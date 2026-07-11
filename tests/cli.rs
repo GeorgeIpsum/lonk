@@ -111,6 +111,23 @@ fn setup_without_url_and_without_tty_errors_with_hint() {
 }
 
 #[test]
+fn qr_flag_without_urls_is_a_usage_error() {
+  let dir = tempfile::tempdir().unwrap();
+  let out = lonk()
+    .env("LONK_CONFIG_DIR", dir.path())
+    .arg("--qr")
+    .stdin(std::process::Stdio::piped()) // not a TTY; must not trigger setup prompt
+    .output()
+    .expect("run lonk");
+  assert_eq!(out.status.code(), Some(1));
+  assert!(
+    String::from_utf8_lossy(&out.stderr).contains("URL"),
+    "stderr: {}",
+    String::from_utf8_lossy(&out.stderr)
+  );
+}
+
+#[test]
 fn setup_preserves_other_profiles() {
   let dir = tempfile::tempdir().unwrap();
   for args in [
