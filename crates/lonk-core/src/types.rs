@@ -13,6 +13,8 @@ pub struct LinkResp {
   pub url: String,
   pub short_url: String,
   pub qr_url: String,
+  // default keeps a newer CLI compatible with pre-headers lonkd responses
+  #[serde(default)]
   pub headers: Vec<(String, String)>,
 }
 
@@ -59,6 +61,16 @@ mod tests {
     };
     let json = serde_json::to_string(&resp).unwrap();
     assert_eq!(serde_json::from_str::<LinkResp>(&json).unwrap(), resp);
+  }
+
+  #[test]
+  fn link_resp_headers_default_when_absent() {
+    // a pre-headers lonkd omits the headers key entirely
+    let resp: LinkResp = serde_json::from_str(
+      r#"{"id":"Ab3dEf9","url":"https://e.com/x","short_url":"/Ab3dEf9","qr_url":"/Ab3dEf9/qr"}"#,
+    )
+    .unwrap();
+    assert_eq!(resp.headers, vec![]);
   }
 
   #[test]
