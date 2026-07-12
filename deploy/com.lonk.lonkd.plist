@@ -22,6 +22,10 @@
   <dict>
     <key>LONK_DB</key>
     <string>/usr/local/var/lonk/lonk.db</string>
+    <!-- Bind beyond localhost (see the README's dead-link-checks note):
+    <key>ROCKET_ADDRESS</key>
+    <string>0.0.0.0</string>
+    -->
     <key>ROCKET_PORT</key>
     <string>8000</string>
     <!-- Serve a bespoke UI from disk instead of the embedded one:
