@@ -4,10 +4,11 @@ use rocket::http::uri::Host;
 use rocket::http::{ContentType, Status};
 use rocket::response::{status, Redirect};
 use rocket::serde::json::Json;
-use rocket::serde::{Deserialize, Serialize};
+use rocket::serde::Serialize;
 use rocket::State;
 
 use crate::db::{gen_slug, Db};
+use lonk_core::types::{CreateLinkReq, LinkResp, ValidResp};
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -30,33 +31,10 @@ fn db_error(_: rusqlite::Error) -> ApiError {
   api_error(Status::InternalServerError, "database error")
 }
 
-#[derive(Deserialize)]
-#[serde(crate = "rocket::serde")]
-pub struct CreateReq {
-  url: String,
-}
-
-#[derive(Serialize)]
-#[serde(crate = "rocket::serde")]
-pub struct LinkResp {
-  id: String,
-  url: String,
-  short_url: String,
-  qr_url: String,
-}
-
-#[derive(Serialize)]
-#[serde(crate = "rocket::serde")]
-pub struct ValidResp {
-  valid: bool,
-  #[serde(skip_serializing_if = "Option::is_none")]
-  error: Option<String>,
-}
-
 #[rocket::post("/api/links", data = "<body>")]
 pub fn create_link(
   db: &State<Db>,
-  body: Json<CreateReq>,
+  body: Json<CreateLinkReq>,
 ) -> Result<status::Created<Json<LinkResp>>, ApiError> {
   let parsed = lonk_core::validate_url(&body.url)
     .map_err(|e| api_error(Status::BadRequest, &e.to_string()))?;
@@ -105,7 +83,7 @@ pub fn qr_svg(
 }
 
 #[rocket::post("/api/valid", data = "<body>")]
-pub fn valid_url(body: Json<CreateReq>) -> Json<ValidResp> {
+pub fn valid_url(body: Json<CreateLinkReq>) -> Json<ValidResp> {
   match lonk_core::validate_url(&body.url) {
     Ok(_) => Json(ValidResp {
       valid: true,

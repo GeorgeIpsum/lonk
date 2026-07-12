@@ -3,6 +3,7 @@ use std::fmt;
 pub use url::Url;
 
 pub mod paths;
+pub mod types;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum ValidateError {

@@ -213,13 +213,10 @@ fn shorten_one(base: &str, url: &str) -> Result<String, (i32, String)> {
       }
       ureq::Error::Transport(t) => (EXIT_NETWORK, t.to_string()),
     })?;
-  let body: serde_json::Value = resp
+  let body: lonk_core::types::LinkResp = resp
     .into_json()
     .map_err(|e| (EXIT_NETWORK, format!("bad response: {e}")))?;
-  let short_path = body["short_url"]
-    .as_str()
-    .ok_or((EXIT_NETWORK, "response missing short_url".to_string()))?;
-  Ok(format!("{base}{short_path}"))
+  Ok(format!("{base}{}", body.short_url))
 }
 
 /// Print the short url, plus a QR code (unicode to stdout, or SVG to stdout
