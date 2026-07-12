@@ -2,7 +2,13 @@ use std::net::TcpStream;
 use std::process::{Child, Command, Stdio};
 use std::time::{Duration, Instant};
 
-const PORT: u16 = 8907;
+// Tests in this binary run concurrently under the default harness, so each
+// test that spawns a server must own a unique port: two lonkd processes
+// racing to bind the same port would leave the loser silently unbound
+// (stderr is nulled) while its readiness poll connects to the winner,
+// letting the test pass by luck against the wrong server/DB.
+const PORT_END_TO_END: u16 = 8907;
+const PORT_TRAILING_SLASH: u16 = 8908;
 
 struct ServerGuard(Child);
 
@@ -13,11 +19,11 @@ impl Drop for ServerGuard {
   }
 }
 
-fn start_server(dbdir: &std::path::Path) -> ServerGuard {
+fn start_server(dbdir: &std::path::Path, port: u16) -> ServerGuard {
   let child = Command::new(env!("CARGO_BIN_EXE_lonkd"))
     .env("LONK_DB", dbdir.join("live.db"))
     .env("ROCKET_ADDRESS", "127.0.0.1")
-    .env("ROCKET_PORT", PORT.to_string())
+    .env("ROCKET_PORT", port.to_string())
     .env("ROCKET_LOG_LEVEL", "off")
     .stdout(Stdio::null())
     .stderr(Stdio::null())
@@ -25,12 +31,12 @@ fn start_server(dbdir: &std::path::Path) -> ServerGuard {
     .expect("spawn lonkd");
   let deadline = Instant::now() + Duration::from_secs(15);
   while Instant::now() < deadline {
-    if TcpStream::connect(("127.0.0.1", PORT)).is_ok() {
+    if TcpStream::connect(("127.0.0.1", port)).is_ok() {
       return ServerGuard(child);
     }
     std::thread::sleep(Duration::from_millis(100));
   }
-  panic!("lonkd did not start listening on {PORT}");
+  panic!("lonkd did not start listening on {port}");
 }
 
 fn lonk_with_config(dir: &std::path::Path) -> Command {
@@ -39,19 +45,21 @@ fn lonk_with_config(dir: &std::path::Path) -> Command {
   c
 }
 
-fn base() -> String {
-  format!("http://127.0.0.1:{PORT}")
+fn base(port: u16) -> String {
+  format!("http://127.0.0.1:{port}")
 }
 
-// Single #[test] so the server/port is used by exactly one test at a time.
+// All end-to-end scenarios against one server share this single #[test];
+// its port (PORT_END_TO_END) is owned by this test alone.
 #[test]
 fn shorten_end_to_end() {
+  let base = base(PORT_END_TO_END);
   let tmp = tempfile::tempdir().unwrap();
-  let _server = start_server(tmp.path());
+  let _server = start_server(tmp.path(), PORT_END_TO_END);
 
   // setup
   let out = lonk_with_config(tmp.path())
-    .args(["setup", &base()])
+    .args(["setup", &base])
     .output()
     .unwrap();
   assert_eq!(out.status.code(), Some(0));
@@ -71,7 +79,7 @@ fn shorten_end_to_end() {
   let lines: Vec<&str> = stdout.lines().collect();
   assert_eq!(lines.len(), 2);
   for line in &lines {
-    assert!(line.starts_with(&format!("{}/", base())), "line: {line}");
+    assert!(line.starts_with(&format!("{base}/")), "line: {line}");
   }
 
   // a short link actually redirects to the original
@@ -95,7 +103,7 @@ fn shorten_end_to_end() {
     .lines()
     .next()
     .unwrap()
-    .starts_with(&format!("{}/", base())));
+    .starts_with(&format!("{base}/")));
   assert!(
     stdout.contains('\u{2588}'),
     "no unicode blocks in: {stdout}"
@@ -109,7 +117,7 @@ fn shorten_end_to_end() {
   assert_eq!(out.status.code(), Some(0));
   let stdout = String::from_utf8_lossy(&out.stdout);
   assert!(stdout.trim_start().starts_with("<?xml") || stdout.trim_start().starts_with("<svg"));
-  assert!(String::from_utf8_lossy(&out.stderr).contains(&format!("{}/", base())));
+  assert!(String::from_utf8_lossy(&out.stderr).contains(&format!("{base}/")));
 
   // --qr-svg with two urls is a usage error
   let out = lonk_with_config(tmp.path())
@@ -148,10 +156,13 @@ fn shorten_unconfigured_without_tty_hints_setup() {
   assert!(String::from_utf8_lossy(&out.stderr).contains("lonk setup"));
 }
 
+// Owns PORT_TRAILING_SLASH: it must spawn its own server, and sharing the
+// end-to-end test's port would race under the parallel default harness.
 #[test]
 fn shorten_with_trailing_slash_config_base_url() {
+  let base = base(PORT_TRAILING_SLASH);
   let tmp = tempfile::tempdir().unwrap();
-  let _server = start_server(tmp.path());
+  let _server = start_server(tmp.path(), PORT_TRAILING_SLASH);
 
   // Hand-write a config with a trailing slash on base_url, bypassing
   // `setup`'s own normalization, so this exercises the read path in
@@ -160,7 +171,7 @@ fn shorten_with_trailing_slash_config_base_url() {
   // fails with a network/server error (exit 2) instead of succeeding.
   std::fs::write(
     tmp.path().join("config.toml"),
-    format!("[profiles.default]\nbase_url = \"{}/\"\n", base()),
+    format!("[profiles.default]\nbase_url = \"{base}/\"\n"),
   )
   .unwrap();
 
@@ -177,7 +188,7 @@ fn shorten_with_trailing_slash_config_base_url() {
   let stdout = String::from_utf8_lossy(&out.stdout);
   let short = stdout.trim();
   assert!(
-    short.starts_with(&format!("{}/", base())) && !short.contains("//api/"),
+    short.starts_with(&format!("{base}/")) && !short.contains("//api/"),
     "short url: {short}"
   );
 
