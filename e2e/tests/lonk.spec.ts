@@ -62,3 +62,20 @@ test('POST /api/valid contract', async ({ request }) => {
   expect(body.valid).toBe(false);
   expect(body.error).toBeTruthy();
 });
+
+test('custom response header set via the advanced section', async ({ page, request }) => {
+  await page.goto('/');
+  await page.click('#advanced summary');
+  await page.click('#add-header');
+  await page.fill('.h-name', 'X-E2E-Header');
+  await page.fill('.h-value', 'hello');
+  await page.fill('#url', 'https://example.com/e2e/headers');
+  await page.click('button[type=submit]');
+
+  const link = page.locator('#short');
+  await expect(link).toBeVisible();
+  const href = await link.getAttribute('href');
+  const res = await request.get(href!, { maxRedirects: 0 });
+  expect(res.status()).toBe(303);
+  expect(res.headers()['x-e2e-header']).toBe('hello');
+});
