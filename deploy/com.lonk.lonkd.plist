@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  lonk server as a macOS LaunchDaemon (starts at boot, runs as root).
+  Install:
+    sudo cp target/release/lonkd /usr/local/bin/lonkd
+    sudo mkdir -p /usr/local/var/lonk
+    sudo cp deploy/com.lonk.lonkd.plist /Library/LaunchDaemons/
+    sudo launchctl bootstrap system /Library/LaunchDaemons/com.lonk.lonkd.plist
+  For a login-time user agent instead, copy to ~/Library/LaunchAgents and use
+  `launchctl bootstrap gui/$(id -u) ...` (then LONK_DB may use your home dir).
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.lonk.lonkd</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/local/bin/lonkd</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>LONK_DB</key>
+    <string>/usr/local/var/lonk/lonk.db</string>
+    <key>ROCKET_PORT</key>
+    <string>8000</string>
+    <!-- Serve a bespoke UI from disk instead of the embedded one:
+    <key>LONK_WEB_DIR</key>
+    <string>/usr/local/var/lonk/web</string>
+    -->
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+</dict>
+</plist>
