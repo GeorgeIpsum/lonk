@@ -16,16 +16,6 @@ impl Db {
        )",
       [],
     )?;
-    // Databases created before the headers feature lack the column; add it.
-    let has_headers: bool = conn
-      .prepare("SELECT 1 FROM pragma_table_info('links') WHERE name = 'headers'")?
-      .exists([])?;
-    if !has_headers {
-      conn.execute(
-        "ALTER TABLE links ADD COLUMN headers TEXT NOT NULL DEFAULT '[]'",
-        [],
-      )?;
-    }
     Ok(Db(Mutex::new(conn)))
   }
 
@@ -138,34 +128,5 @@ mod tests {
   fn get_link_unknown_id_is_none() {
     let db = Db::open(":memory:").unwrap();
     assert_eq!(db.get_link("nope").unwrap(), None);
-  }
-
-  #[test]
-  fn open_migrates_pre_headers_schema() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("old.db");
-    {
-      let conn = rusqlite::Connection::open(&path).unwrap();
-      conn
-        .execute(
-          "CREATE TABLE links (id TEXT PRIMARY KEY, url TEXT NOT NULL, created_at TEXT NOT NULL)",
-          [],
-        )
-        .unwrap();
-      conn
-        .execute(
-          "INSERT INTO links VALUES ('old1234', 'https://example.com/old', datetime('now'))",
-          [],
-        )
-        .unwrap();
-    }
-    let db = Db::open(path.to_str().unwrap()).unwrap();
-    assert_eq!(
-      db.get_link("old1234").unwrap().unwrap(),
-      ("https://example.com/old".to_string(), vec![])
-    );
-    assert!(db
-      .insert("new1234", "https://example.com/new", "[]")
-      .unwrap());
   }
 }

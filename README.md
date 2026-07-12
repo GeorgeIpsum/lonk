@@ -35,38 +35,12 @@ are rejected.
 
 ### Dead-link checks
 
-`GET /<id>/status` makes the server probe the stored destination (HEAD,
-falling back to GET on 405/501, up to 5 redirects, 5s timeout per attempt
-(HEAD, plus the one GET retry)); the destination is alive when the final
-response is 2xx. Note: this means anyone who can reach your lonkd can
-make it issue requests to stored URLs and see whether they answered —
-on a self-hosted instance this is
-the same trust level as creating links.
-
-## Upgrading from pre-CLI versions
-
-Two deploy-affecting changes landed alongside the `lonk` CLI:
-
-- The server binary was renamed from `lonk` to `lonkd`. Update whatever
-  starts it (systemd unit, Dockerfile `CMD`, process manager, etc).
-- The default SQLite path moved from `./lonk.db` (the process's current
-  working directory) to `<config-dir>/lonk.db`
-  (`~/.config/lonk/lonk.db` by default). If you relied on the old default
-  and don't set `LONK_DB` explicitly, the next restart will silently open a
-  fresh, empty database instead of your existing one.
-
-  To keep your existing data, either:
-
-  ```bash
-  export LONK_DB=./lonk.db   # keep using the old path
-  ```
-
-  or move the file to the new default location:
-
-  ```bash
-  mkdir -p ~/.config/lonk
-  mv ./lonk.db ~/.config/lonk/lonk.db
-  ```
+`GET /<id>/status` makes the server probe the stored destination: HEAD,
+falling back to GET on 405/501, up to 5 redirects, 5s timeout per attempt;
+the destination is alive when the final response is 2xx. Note: this means
+anyone who can reach your lonkd can make it issue requests to stored URLs
+and see whether they answered — on a self-hosted instance this is the same
+trust level as creating links.
 
 ## CLI (`lonk`)
 
