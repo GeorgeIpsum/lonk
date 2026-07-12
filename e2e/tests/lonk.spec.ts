@@ -79,3 +79,22 @@ test('custom response header set via the advanced section', async ({ page, reque
   expect(res.status()).toBe(303);
   expect(res.headers()['x-e2e-header']).toBe('hello');
 });
+
+test('link status reports alive and dead destinations', async ({ request, baseURL }) => {
+  const alive = await request.post('/api/links', { data: { url: `${baseURL}/` } });
+  const aliveId = (await alive.json()).id;
+  const res1 = await request.get(`/${aliveId}/status`);
+  expect(res1.status()).toBe(200);
+  const body1 = await res1.json();
+  expect(body1.alive).toBe(true);
+  expect(body1.http_status).toBe(200);
+
+  const dead = await request.post('/api/links', { data: { url: `${baseURL}/zzzzzzz` } });
+  const deadId = (await dead.json()).id;
+  const body2 = await (await request.get(`/${deadId}/status`)).json();
+  expect(body2.alive).toBe(false);
+  expect(body2.http_status).toBe(404);
+
+  const missing = await request.get('/zzzzzzz/status');
+  expect(missing.status()).toBe(404);
+});
