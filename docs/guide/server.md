@@ -21,7 +21,7 @@ single SQLite file.
 | ------------------ | --------------------------------------------------------------- | ------- |
 | `LONK_CONFIG_DIR`  | Directory used to resolve the default `LONK_DB` path.           | `$XDG_CONFIG_HOME/lonk` if set, else `~/.config/lonk` |
 | `LONK_DB`          | Path to the SQLite database file.                                | `<LONK_CONFIG_DIR>/lonk.db` (the directory is created automatically when this default is used; if you set `LONK_DB` explicitly, its parent directory must already exist) |
-| `LONK_WEB_DIR`     | Serve the web UI from this directory instead of the build embedded in the binary. Any non-empty value switches to directory mode; unset (or empty) serves the embedded UI. | unset (embedded UI) |
+| `LONK_WEB_DIR`     | Serve the web UI from this directory instead of the build embedded in the binary. Any non-empty value switches to directory mode; unset (or empty) serves the embedded UI. Short-link routes take precedence over your files for some paths — see [Route precedence](customizing.md#route-precedence). | unset (embedded UI) |
 | `ROCKET_ADDRESS`   | Address `lonkd` binds to.                                        | `127.0.0.1` |
 | `ROCKET_PORT`      | Port `lonkd` binds to.                                           | `8000` |
 
@@ -171,7 +171,7 @@ Dead/unknown, transport failure (DNS, connection refused, timeout — no
 HTTP status to report):
 
 ```json
-{"id":"fzpAKv9","url":"https://this-domain-should-not-exist-lonk-test.invalid/","alive":false,"error":"Dns Failed: resolve dns name 'this-domain-should-not-exist-lonk-test.invalid:443': failed to lookup address information: nodename nor servname provided, or not known"}
+{"id":"fzpAKv9","url":"https://this-domain-should-not-exist-lonk-test.invalid/","alive":false,"error":"https://this-domain-should-not-exist-lonk-test.invalid/: Dns Failed: resolve dns name 'this-domain-should-not-exist-lonk-test.invalid:443': failed to lookup address information: nodename nor servname provided, or not known"}
 ```
 
 (the exact transport-error text is platform-dependent; the shape — `alive:

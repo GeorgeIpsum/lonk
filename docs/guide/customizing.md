@@ -68,6 +68,33 @@ step required — it works with **any** static files, not just something
 built from `web/`'s toolchain. This is what the [deploy
 files](deployment.md) show as a commented-out option for production use.
 
+### Route precedence
+
+Short-link routes are matched before UI-asset routes, so a handful of
+`LONK_WEB_DIR` paths never reach your files:
+
+- **Top-level files without a dot in the name** (e.g. `logo`, `LICENSE`)
+  are captured by the redirect route (`GET /<id>`), because that route's
+  id guard only rejects params containing a `.` — a dot-free filename
+  looks exactly like a link id to it. Since it's not a real id, you get
+  `404 {"error":"no such link"}` instead of the file. Give asset files
+  extensions (`logo.svg`, `LICENSE.txt`) to avoid this.
+- **Two-segment paths shaped like `/<something>/qr` or
+  `/<something>/status`** are captured by the QR-code and dead-link-check
+  routes (`GET /<id>/qr`, `GET /<id>/status`) regardless of whether
+  `<something>` is a real link id — so e.g. `docs/status` in your
+  `LONK_WEB_DIR` is unreachable and also 404s with `{"error":"no such
+  link"}`. Avoid asset paths shaped like this.
+- **Dotfiles and dot-directories** (e.g. `.well-known/...`) are rejected
+  by the router itself before any route body runs, and can never be
+  served from `LONK_WEB_DIR` — you'll get a `422` with a generic JSON
+  error body, not your file.
+- Any other dotted path segment that isn't a real link id and isn't a
+  real asset (e.g. a `favicon.ico` you haven't added yet) 404s with the
+  generic JSON error body (`{"error":"Not Found"}`) rather than `"no
+  such link"` — that message is specific to the redirect route, which
+  dotted single segments never reach.
+
 ## A minimal bespoke UI
 
 Since `lonk-client` is a private, unpublished package, a UI with no build
@@ -105,6 +132,7 @@ If your project already has a bundler and vendors (or workspace-links)
 `lonk-client`, the equivalent using `createClient()` is:
 
 ```html
+<!-- requires a bundler or import map: 'lonk-client' is a bare specifier -->
 <!doctype html>
 <html>
   <body>
@@ -119,7 +147,7 @@ If your project already has a bundler and vendors (or workspace-links)
         const url = document.querySelector('#url').value;
         try {
           const link = await client.createLink({ url });
-          document.querySelector('#out').textContent = client.shortUrl(link.id);
+          document.querySelector('#out').textContent = location.origin + client.shortUrl(link.id);
         } catch (err) {
           document.querySelector('#out').textContent = `error: ${err.message}`;
         }

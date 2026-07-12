@@ -36,9 +36,11 @@ The base URL is validated (must parse as `http://`/`https://`, and must
 not carry a query string or fragment) and trimmed of a trailing slash
 before saving.
 
-**Interactive first run:** if you shorten a URL before ever running
-`setup`, and no `default` profile exists, and stdin is a terminal, `lonk`
-prompts once instead of failing:
+**Interactive first run:** if you shorten a URL (or run `lonk status`)
+before ever running `setup`, and no `default` profile exists, and stdin
+is a terminal, `lonk` prompts once instead of failing — any command that
+needs to resolve the `default` profile triggers this, not just
+shortening:
 
 ```
 Base URL of your lonk server: 
