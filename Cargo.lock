@@ -873,6 +873,7 @@ dependencies = [
  "rocket",
  "rusqlite",
  "serde_json",
+ "tempfile",
 ]
 
 [[package]]

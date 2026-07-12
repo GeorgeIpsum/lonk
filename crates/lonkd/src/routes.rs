@@ -40,7 +40,7 @@ pub fn create_link(
     .map_err(|e| api_error(Status::BadRequest, &e.to_string()))?;
   for _ in 0..8 {
     let id = gen_slug(7);
-    if db.insert(&id, parsed.as_str()).map_err(db_error)? {
+    if db.insert(&id, parsed.as_str(), "[]").map_err(db_error)? {
       let resp = LinkResp {
         short_url: format!("/{id}"),
         qr_url: format!("/{id}/qr"),
