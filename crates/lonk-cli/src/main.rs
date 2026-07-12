@@ -24,11 +24,12 @@ fn main() {
 }
 
 fn run(cli: Cli) -> i32 {
-  match cli.cmd {
+  match &cli.cmd {
     Some(Cmd::Setup { base_url }) => {
       let profile = cli.profile.as_deref().unwrap_or("default");
-      run_setup(base_url, profile)
+      run_setup(base_url.clone(), profile)
     }
+    Some(Cmd::Status { ref target }) => run_status(target, cli.profile.as_deref()),
     None if cli.valid => run_valid(&cli.urls),
     None => run_shorten(&cli),
   }
@@ -224,6 +225,67 @@ fn resolve_base_url(profile: Option<&str>) -> Result<String, i32> {
     None => {
       eprintln!("no server configured; run: lonk setup <base-url>");
       Err(EXIT_USAGE)
+    }
+  }
+}
+
+/// A bare slug passes through; a full short URL contributes its last path segment.
+fn extract_slug(target: &str) -> Result<String, String> {
+  if !target.starts_with("http://") && !target.starts_with("https://") {
+    return Ok(target.to_string());
+  }
+  let parsed = lonk_core::validate_url(target).map_err(|e| e.to_string())?;
+  parsed
+    .path_segments()
+    .and_then(|segments| segments.filter(|s| !s.is_empty()).last())
+    .map(String::from)
+    .ok_or_else(|| format!("no slug in url {target:?}"))
+}
+
+fn run_status(target: &str, profile: Option<&str>) -> i32 {
+  let slug = match extract_slug(target) {
+    Ok(slug) => slug,
+    Err(e) => {
+      eprintln!("{e}");
+      return EXIT_USAGE;
+    }
+  };
+  let base = match resolve_base_url(profile) {
+    Ok(base) => base,
+    Err(code) => return code,
+  };
+  match ureq::get(&format!("{base}/{slug}/status")).call() {
+    Ok(resp) => {
+      let body: lonk_core::types::StatusResp = match resp.into_json() {
+        Ok(body) => body,
+        Err(e) => {
+          eprintln!("bad response: {e}");
+          return EXIT_NETWORK;
+        }
+      };
+      if body.alive {
+        println!("alive ({})", body.http_status.unwrap_or(0));
+        EXIT_OK
+      } else {
+        match (body.http_status, body.error) {
+          (Some(code), _) => println!("dead ({code})"),
+          (None, Some(err)) => println!("dead ({err})"),
+          (None, None) => println!("dead"),
+        }
+        EXIT_USAGE
+      }
+    }
+    Err(ureq::Error::Status(404, _)) => {
+      eprintln!("no such link: {slug}");
+      EXIT_USAGE
+    }
+    Err(ureq::Error::Status(code, _)) => {
+      eprintln!("server returned {code}");
+      EXIT_NETWORK
+    }
+    Err(ureq::Error::Transport(t)) => {
+      eprintln!("{t}");
+      EXIT_NETWORK
     }
   }
 }

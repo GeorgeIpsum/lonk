@@ -42,6 +42,11 @@ pub enum Cmd {
     /// e.g. https://s.example.com (prompts if omitted)
     base_url: Option<String>,
   },
+  /// Check whether a short link's destination is alive
+  Status {
+    /// Slug or full short URL (e.g. Ab3dEf9 or https://s.example.com/Ab3dEf9)
+    target: String,
+  },
 }
 
 #[cfg(test)]
@@ -95,5 +100,14 @@ mod tests {
     ])
     .unwrap();
     assert_eq!(cli.headers, vec!["X-A: 1", "X-B: 2"]);
+  }
+
+  #[test]
+  fn parses_status_subcommand() {
+    let cli = Cli::try_parse_from(["lonk", "status", "Ab3dEf9"]).unwrap();
+    match cli.cmd {
+      Some(Cmd::Status { target }) => assert_eq!(target, "Ab3dEf9"),
+      other => panic!("expected status, got {other:?}"),
+    }
   }
 }

@@ -64,6 +64,74 @@ fn base(port: u16) -> String {
   format!("http://127.0.0.1:{port}")
 }
 
+// Owns PORT_STATUS: it must spawn its own server, and sharing the
+// end-to-end test's port would race under the parallel default harness.
+#[test]
+fn status_subcommand_end_to_end() {
+  const PORT_STATUS: u16 = 8910;
+  let tmp = tempfile::tempdir().unwrap();
+  let _server = start_server(tmp.path(), PORT_STATUS);
+  let base = base(PORT_STATUS);
+
+  let out = lonk_with_config(tmp.path())
+    .args(["setup", &base])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(0));
+
+  // a link whose destination is the server's own index page: alive
+  let out = lonk_with_config(tmp.path())
+    .arg(format!("{base}/"))
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(0));
+  let short = String::from_utf8_lossy(&out.stdout).trim().to_string();
+  let slug = short.rsplit('/').next().unwrap().to_string();
+
+  // by slug
+  let out = lonk_with_config(tmp.path())
+    .args(["status", &slug])
+    .output()
+    .unwrap();
+  assert_eq!(
+    out.status.code(),
+    Some(0),
+    "stderr: {}",
+    String::from_utf8_lossy(&out.stderr)
+  );
+  assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "alive (200)");
+
+  // by full short URL
+  let out = lonk_with_config(tmp.path())
+    .args(["status", &short])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(0));
+  assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "alive (200)");
+
+  // dead destination: the server's own 404 page
+  let out = lonk_with_config(tmp.path())
+    .arg(format!("{base}/zzzzzzz"))
+    .output()
+    .unwrap();
+  let dead_short = String::from_utf8_lossy(&out.stdout).trim().to_string();
+  let dead_slug = dead_short.rsplit('/').next().unwrap().to_string();
+  let out = lonk_with_config(tmp.path())
+    .args(["status", &dead_slug])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(1));
+  assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "dead (404)");
+
+  // unknown slug
+  let out = lonk_with_config(tmp.path())
+    .args(["status", "zzzzzzz"])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(1));
+  assert!(String::from_utf8_lossy(&out.stderr).contains("zzzzzzz"));
+}
+
 // All end-to-end scenarios against one server share this single #[test];
 // its port (PORT_END_TO_END) is owned by this test alone.
 #[test]
