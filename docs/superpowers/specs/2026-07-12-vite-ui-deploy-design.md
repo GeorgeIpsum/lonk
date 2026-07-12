@@ -6,7 +6,7 @@ Branch: `feat/vite-ui-and-deploy`, stacked on `feat/cli-and-e2e` (PR #2).
 
 ## Goal
 
-Four related deliverables:
+Five related deliverables:
 
 1. Rebuild the web UI as a Vite (vanilla TypeScript) project in `web/`,
    splitting today's single `static/index.html` into hackable sources.
@@ -18,6 +18,8 @@ Four related deliverables:
    and usable by anyone building a bespoke UI.
 4. `deploy/` daemon files (systemd unit + launchd LaunchDaemon plist) and
    README sections so `lonkd` runs at boot on Linux and macOS.
+5. A markdown docs guide under `docs/guide/`, published to GitHub Pages by
+   a GitHub Actions workflow (plain markdown + Jekyll, no local tooling).
 
 ## Decisions already made (with the user)
 
@@ -176,6 +178,43 @@ pub enum WebSource { Embedded, Dir(PathBuf) }  // from LONK_WEB_DIR
     bespoke-UI story (`LONK_WEB_DIR` + `lonk-client`).
   - Development section: note that building `lonkd` now requires the web
     build to exist (the build.rs check and its message).
+
+## Docs guide (GitHub Pages)
+
+Decisions (with the user): **plain markdown + Jekyll** (no local doc
+toolchain — GitHub's builder renders it), deployed by a **GitHub Actions
+workflow** (the repo's first CI file).
+
+- Content lives in `docs/guide/` — deliberately a subdirectory, so the
+  internal planning docs in `docs/superpowers/` are never published.
+- Pages (each starts with a small front-matter block and a one-line nav
+  linking back to the index; Pages' built-in themes have no sidebar):
+  - `index.md` — what lonk is, quick start (server + CLI in five commands)
+  - `server.md` — running `lonkd`, env vars (`LONK_DB`, `LONK_CONFIG_DIR`,
+    `LONK_WEB_DIR`, `ROCKET_*`), full API reference (the README table,
+    expanded with request/response examples)
+  - `cli.md` — setup, profiles, shortening, `-H`, `--qr`/`--qr-svg`,
+    `--valid`, `status`, exit codes
+  - `headers.md` — response-headers guide: what redirect response headers
+    can and cannot do, use cases, validation rules and denylist
+  - `customizing.md` — hacking the bundled UI (Vite dev loop), serving a
+    bespoke UI via `LONK_WEB_DIR`, using `lonk-client`
+  - `deployment.md` — the daemon guides (systemd + launchd), single-binary
+    builds, the status probe-oracle note
+- `docs/guide/_config.yml`: `theme: jekyll-theme-cayman` (a Pages built-in),
+  site title/description. Nothing else.
+- `.github/workflows/docs.yml`: on push to `main` touching `docs/guide/**`
+  (plus `workflow_dispatch`), `actions/checkout` →
+  `actions/jekyll-build-pages` with `source: ./docs/guide` →
+  `actions/upload-pages-artifact` → `actions/deploy-pages`, with the
+  standard `pages: write` / `id-token: write` permissions and a
+  `github-pages` environment.
+- One-time manual step (documented in the workflow header comment): repo
+  Settings → Pages → Source = "GitHub Actions".
+- Content accuracy rule: every command, flag, path, and response shape in
+  the guide must exist exactly as documented (same standard as the README
+  task last plan). The guide complements the README; the README stays the
+  short version and gains a link to the published guide.
 
 ## Testing
 
