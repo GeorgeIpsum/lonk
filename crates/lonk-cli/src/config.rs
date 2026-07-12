@@ -14,7 +14,7 @@ pub struct Profile {
 }
 
 pub fn config_path() -> PathBuf {
-  lonk::paths::config_dir().join("config.toml")
+  lonk_core::paths::config_dir().join("config.toml")
 }
 
 impl Config {

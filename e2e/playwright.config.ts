@@ -15,7 +15,7 @@ export default defineConfig({
   webServer: process.env.BASE_URL
     ? undefined
     : {
-        command: 'cargo run --bin lonkd',
+        command: 'cargo run -p lonkd --bin lonkd',
         cwd: '..',
         url: baseURL,
         reuseExistingServer: false,

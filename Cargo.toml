@@ -1,30 +1,3 @@
-[package]
-name = "lonk"
-version = "0.1.0"
-edition = "2021"
-
-[[bin]]
-name = "lonkd"
-path = "src/main.rs"
-
-[[bin]]
-name = "lonk"
-path = "src/cli/main.rs"
-
-[dependencies]
-rocket = { version = "0.5.1", features = ["json"] }
-rusqlite = { version = "0.31", features = ["bundled"] }
-qrcode = { version = "0.14", default-features = false, features = ["svg"] }
-rand = "0.8"
-lonk-validate = { path = "crates/lonk-validate" }
-clap = { version = "4", features = ["derive"] }
-ureq = { version = "2", features = ["json"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-toml = "0.8"
-
-[dev-dependencies]
-tempfile = "3"
-
 [workspace]
-members = ["crates/lonk-validate"]
+resolver = "2"
+members = ["crates/lonk-core", "crates/lonkd", "crates/lonk-cli"]

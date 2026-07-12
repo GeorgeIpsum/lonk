@@ -1,7 +1,0 @@
-[package]
-name = "lonk-validate"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-url = "2"

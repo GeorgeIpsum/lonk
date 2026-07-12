@@ -62,3 +62,39 @@ test('POST /api/valid contract', async ({ request }) => {
   expect(body.valid).toBe(false);
   expect(body.error).toBeTruthy();
 });
+
+test('custom response header set via the advanced section', async ({ page, request }) => {
+  await page.goto('/');
+  await page.click('#advanced summary');
+  await page.click('#add-header');
+  await page.fill('.h-name', 'X-E2E-Header');
+  await page.fill('.h-value', 'hello');
+  await page.fill('#url', 'https://example.com/e2e/headers');
+  await page.click('button[type=submit]');
+
+  const link = page.locator('#short');
+  await expect(link).toBeVisible();
+  const href = await link.getAttribute('href');
+  const res = await request.get(href!, { maxRedirects: 0 });
+  expect(res.status()).toBe(303);
+  expect(res.headers()['x-e2e-header']).toBe('hello');
+});
+
+test('link status reports alive and dead destinations', async ({ request, baseURL }) => {
+  const alive = await request.post('/api/links', { data: { url: `${baseURL}/` } });
+  const aliveId = (await alive.json()).id;
+  const res1 = await request.get(`/${aliveId}/status`);
+  expect(res1.status()).toBe(200);
+  const body1 = await res1.json();
+  expect(body1.alive).toBe(true);
+  expect(body1.http_status).toBe(200);
+
+  const dead = await request.post('/api/links', { data: { url: `${baseURL}/zzzzzzz` } });
+  const deadId = (await dead.json()).id;
+  const body2 = await (await request.get(`/${deadId}/status`)).json();
+  expect(body2.alive).toBe(false);
+  expect(body2.http_status).toBe(404);
+
+  const missing = await request.get('/zzzzzzz/status');
+  expect(missing.status()).toBe(404);
+});

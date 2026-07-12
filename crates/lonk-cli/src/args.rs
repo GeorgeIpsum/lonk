@@ -27,6 +27,10 @@ pub struct Cli {
   #[arg(long, global = true, value_name = "NAME")]
   pub profile: Option<String>,
 
+  /// Custom response header for the created link(s), "Name: value" (repeatable)
+  #[arg(short = 'H', long = "header", value_name = "NAME: VALUE")]
+  pub headers: Vec<String>,
+
   #[command(subcommand)]
   pub cmd: Option<Cmd>,
 }
@@ -37,6 +41,11 @@ pub enum Cmd {
   Setup {
     /// e.g. https://s.example.com (prompts if omitted)
     base_url: Option<String>,
+  },
+  /// Check whether a short link's destination is alive
+  Status {
+    /// Slug or full short URL (e.g. Ab3dEf9 or https://s.example.com/Ab3dEf9)
+    target: String,
   },
 }
 
@@ -77,5 +86,28 @@ mod tests {
       err.kind(),
       clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
     );
+  }
+
+  #[test]
+  fn parses_repeated_headers() {
+    let cli = Cli::try_parse_from([
+      "lonk",
+      "-H",
+      "X-A: 1",
+      "--header",
+      "X-B: 2",
+      "https://a.example",
+    ])
+    .unwrap();
+    assert_eq!(cli.headers, vec!["X-A: 1", "X-B: 2"]);
+  }
+
+  #[test]
+  fn parses_status_subcommand() {
+    let cli = Cli::try_parse_from(["lonk", "status", "Ab3dEf9"]).unwrap();
+    match cli.cmd {
+      Some(Cmd::Status { target }) => assert_eq!(target, "Ab3dEf9"),
+      other => panic!("expected status, got {other:?}"),
+    }
   }
 }

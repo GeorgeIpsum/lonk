@@ -2,7 +2,7 @@ use rocket::http::{ContentType, Header, Status};
 use rocket::local::blocking::Client;
 
 fn client() -> Client {
-  Client::tracked(lonk::rocket_app(":memory:")).expect("valid rocket instance")
+  Client::tracked(lonkd::rocket_app(":memory:")).expect("valid rocket instance")
 }
 
 #[test]
@@ -143,4 +143,89 @@ fn valid_endpoint_rejects_bad_url() {
     assert_eq!(body["valid"], false);
     assert!(!body["error"].as_str().expect("error message").is_empty());
   }
+}
+
+#[test]
+fn create_link_with_headers_echoes_and_redirect_carries_them() {
+  let client = client();
+  let res = client
+    .post("/api/links")
+    .header(ContentType::JSON)
+    .body(
+      r#"{"url": "https://example.com/hdr",
+          "headers": [["Set-Cookie","a=1"],["Set-Cookie","b=2"],["X-Track","yes"]]}"#,
+    )
+    .dispatch();
+  assert_eq!(res.status(), Status::Created);
+  let body: serde_json::Value = res.into_json().expect("json body");
+  assert_eq!(body["headers"][0][0], "Set-Cookie");
+  let short_url = body["short_url"].as_str().unwrap().to_string();
+
+  let res = client.get(&short_url).dispatch();
+  assert_eq!(res.status(), Status::SeeOther);
+  assert_eq!(
+    res.headers().get_one("Location"),
+    Some("https://example.com/hdr")
+  );
+  let cookies: Vec<_> = res.headers().get("Set-Cookie").collect();
+  assert_eq!(cookies, vec!["a=1", "b=2"]);
+  assert_eq!(res.headers().get_one("X-Track"), Some("yes"));
+}
+
+#[test]
+fn create_link_without_headers_redirect_is_plain() {
+  let client = client();
+  let res = client
+    .post("/api/links")
+    .header(ContentType::JSON)
+    .body(r#"{"url": "https://example.com/plain"}"#)
+    .dispatch();
+  let body: serde_json::Value = res.into_json().expect("json body");
+  assert_eq!(body["headers"].as_array().unwrap().len(), 0);
+  let res = client.get(body["short_url"].as_str().unwrap()).dispatch();
+  assert_eq!(res.status(), Status::SeeOther);
+  assert_eq!(res.headers().get_one("X-Track"), None);
+}
+
+#[test]
+fn create_link_rejects_invalid_headers() {
+  let client = client();
+  let cases = [
+    r#"{"url":"https://e.com/x","headers":[["Bad Name","v"]]}"#,
+    r#"{"url":"https://e.com/x","headers":[["X-Ok","a\r\nInjected: yes"]]}"#,
+    r#"{"url":"https://e.com/x","headers":[["Location","https://evil.example"]]}"#,
+  ];
+  for case in cases {
+    let res = client
+      .post("/api/links")
+      .header(ContentType::JSON)
+      .body(case)
+      .dispatch();
+    assert_eq!(res.status(), Status::BadRequest, "accepted: {case}");
+  }
+}
+
+#[test]
+fn create_link_rejects_too_many_headers() {
+  let client = client();
+  let headers: Vec<String> = (0..17).map(|i| format!(r#"["X-H{i}","v"]"#)).collect();
+  let body = format!(
+    r#"{{"url":"https://e.com/x","headers":[{}]}}"#,
+    headers.join(",")
+  );
+  let res = client
+    .post("/api/links")
+    .header(ContentType::JSON)
+    .body(body)
+    .dispatch();
+  assert_eq!(res.status(), Status::BadRequest);
+  let body: serde_json::Value = res.into_json().expect("json body");
+  assert!(body["error"].as_str().unwrap().contains("max 16"));
+}
+
+#[test]
+fn status_unknown_id_is_404() {
+  let client = client();
+  let res = client.get("/zzzzzzz/status").dispatch();
+  assert_eq!(res.status(), Status::NotFound);
 }

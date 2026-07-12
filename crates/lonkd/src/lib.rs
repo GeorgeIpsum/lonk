@@ -1,5 +1,4 @@
 pub mod db;
-pub mod paths;
 pub mod routes;
 
 use rocket::fs::{relative, FileServer};
@@ -15,7 +14,8 @@ pub fn rocket_app(db_path: &str) -> Rocket<Build> {
         routes::create_link,
         routes::follow_link,
         routes::qr_svg,
-        routes::valid_url
+        routes::valid_url,
+        routes::link_status
       ],
     )
     .mount("/", FileServer::from(relative!("static")))

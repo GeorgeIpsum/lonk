@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 // letting the test pass by luck against the wrong server/DB.
 const PORT_END_TO_END: u16 = 8907;
 const PORT_TRAILING_SLASH: u16 = 8908;
+const PORT_HEADERS: u16 = 8909;
 
 struct ServerGuard(Child);
 
@@ -19,8 +20,22 @@ impl Drop for ServerGuard {
   }
 }
 
+fn lonkd_bin() -> std::path::PathBuf {
+  // test executables live in target/debug/deps/; the workspace's binaries in target/debug/
+  let mut dir = std::env::current_exe().expect("test exe path");
+  dir.pop(); // deps/
+  dir.pop(); // debug/
+  let bin = dir.join(format!("lonkd{}", std::env::consts::EXE_SUFFIX));
+  assert!(
+    bin.exists(),
+    "lonkd binary not found at {} - run: cargo test --workspace (or cargo build -p lonkd)",
+    bin.display()
+  );
+  bin
+}
+
 fn start_server(dbdir: &std::path::Path, port: u16) -> ServerGuard {
-  let child = Command::new(env!("CARGO_BIN_EXE_lonkd"))
+  let child = Command::new(lonkd_bin())
     .env("LONK_DB", dbdir.join("live.db"))
     .env("ROCKET_ADDRESS", "127.0.0.1")
     .env("ROCKET_PORT", port.to_string())
@@ -47,6 +62,74 @@ fn lonk_with_config(dir: &std::path::Path) -> Command {
 
 fn base(port: u16) -> String {
   format!("http://127.0.0.1:{port}")
+}
+
+// Owns PORT_STATUS: it must spawn its own server, and sharing the
+// end-to-end test's port would race under the parallel default harness.
+#[test]
+fn status_subcommand_end_to_end() {
+  const PORT_STATUS: u16 = 8910;
+  let tmp = tempfile::tempdir().unwrap();
+  let _server = start_server(tmp.path(), PORT_STATUS);
+  let base = base(PORT_STATUS);
+
+  let out = lonk_with_config(tmp.path())
+    .args(["setup", &base])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(0));
+
+  // a link whose destination is the server's own index page: alive
+  let out = lonk_with_config(tmp.path())
+    .arg(format!("{base}/"))
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(0));
+  let short = String::from_utf8_lossy(&out.stdout).trim().to_string();
+  let slug = short.rsplit('/').next().unwrap().to_string();
+
+  // by slug
+  let out = lonk_with_config(tmp.path())
+    .args(["status", &slug])
+    .output()
+    .unwrap();
+  assert_eq!(
+    out.status.code(),
+    Some(0),
+    "stderr: {}",
+    String::from_utf8_lossy(&out.stderr)
+  );
+  assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "alive (200)");
+
+  // by full short URL
+  let out = lonk_with_config(tmp.path())
+    .args(["status", &short])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(0));
+  assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "alive (200)");
+
+  // dead destination: the server's own 404 page
+  let out = lonk_with_config(tmp.path())
+    .arg(format!("{base}/zzzzzzz"))
+    .output()
+    .unwrap();
+  let dead_short = String::from_utf8_lossy(&out.stdout).trim().to_string();
+  let dead_slug = dead_short.rsplit('/').next().unwrap().to_string();
+  let out = lonk_with_config(tmp.path())
+    .args(["status", &dead_slug])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(1));
+  assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "dead (404)");
+
+  // unknown slug
+  let out = lonk_with_config(tmp.path())
+    .args(["status", "zzzzzzz"])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(1));
+  assert!(String::from_utf8_lossy(&out.stderr).contains("zzzzzzz"));
 }
 
 // All end-to-end scenarios against one server share this single #[test];
@@ -221,4 +304,49 @@ fn shorten_with_server_down_is_exit_2() {
     .output()
     .unwrap();
   assert_eq!(out.status.code(), Some(2));
+}
+
+#[test]
+fn shorten_with_headers_end_to_end() {
+  let tmp = tempfile::tempdir().unwrap();
+  let _server = start_server(tmp.path(), PORT_HEADERS);
+  let base = base(PORT_HEADERS);
+
+  let out = lonk_with_config(tmp.path())
+    .args(["setup", &base])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(0));
+
+  let out = lonk_with_config(tmp.path())
+    .args([
+      "-H",
+      "X-Demo: 1",
+      "-H",
+      "Set-Cookie: a=1",
+      "-H",
+      "Set-Cookie: b=2",
+      "https://example.com/with-headers",
+    ])
+    .output()
+    .unwrap();
+  assert_eq!(
+    out.status.code(),
+    Some(0),
+    "stderr: {}",
+    String::from_utf8_lossy(&out.stderr)
+  );
+  let stdout = String::from_utf8_lossy(&out.stdout);
+  let short = stdout.lines().next().unwrap();
+
+  let resp = ureq::AgentBuilder::new()
+    .redirects(0)
+    .build()
+    .get(short)
+    .call()
+    .expect("GET short link");
+  assert_eq!(resp.status(), 303);
+  assert_eq!(resp.header("X-Demo"), Some("1"));
+  let cookies: Vec<&str> = resp.all("Set-Cookie");
+  assert_eq!(cookies, vec!["a=1", "b=2"]);
 }
