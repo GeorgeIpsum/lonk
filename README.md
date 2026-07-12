@@ -36,10 +36,11 @@ are rejected.
 ### Dead-link checks
 
 `GET /<id>/status` makes the server probe the stored destination (HEAD,
-falling back to GET on 405/501, up to 5 redirects, 5s timeout); the
-destination is alive when the final response is 2xx. Note: this means
-anyone who can reach your lonkd can make it issue requests to stored
-URLs and see whether they answered — on a self-hosted instance this is
+falling back to GET on 405/501, up to 5 redirects, 5s timeout per attempt
+(HEAD, plus the one GET retry)); the destination is alive when the final
+response is 2xx. Note: this means anyone who can reach your lonkd can
+make it issue requests to stored URLs and see whether they answered —
+on a self-hosted instance this is
 the same trust level as creating links.
 
 ## Upgrading from pre-CLI versions

@@ -198,3 +198,52 @@ pub fn default_catcher(status: Status, _req: &rocket::Request<'_>) -> Json<Error
     error: status.reason_lossy().to_string(),
   })
 }
+
+#[cfg(test)]
+mod tests {
+  use super::check_destination;
+  use std::io::{BufRead, BufReader, Write};
+  use std::net::TcpListener;
+
+  /// HEAD returns 405, forcing the one-shot GET retry, which returns 200.
+  #[test]
+  fn check_destination_retries_get_on_405() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind ephemeral port");
+    let addr = listener.local_addr().expect("local addr");
+
+    let handle = std::thread::spawn(move || {
+      for _ in 0..2 {
+        let (stream, _) = listener.accept().expect("accept connection");
+        let mut reader = BufReader::new(stream.try_clone().expect("clone stream"));
+        let mut request_line = String::new();
+        reader
+          .read_line(&mut request_line)
+          .expect("read request line");
+        // Drain the rest of the request head.
+        loop {
+          let mut line = String::new();
+          reader.read_line(&mut line).expect("read header line");
+          if line == "\r\n" || line.is_empty() {
+            break;
+          }
+        }
+        let mut stream = reader.into_inner();
+        let response = if request_line.starts_with("HEAD") {
+          "HTTP/1.1 405 Method Not Allowed\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+        } else {
+          "HTTP/1.1 200 OK\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+        };
+        stream
+          .write_all(response.as_bytes())
+          .expect("write response");
+        stream.flush().expect("flush response");
+      }
+    });
+
+    let url = format!("http://{addr}/");
+    let result = check_destination(&url);
+
+    handle.join().expect("server thread panicked");
+    assert_eq!(result, (true, Some(200), None));
+  }
+}
