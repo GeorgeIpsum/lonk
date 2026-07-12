@@ -98,6 +98,46 @@ fn setup_rejects_invalid_base_url() {
 }
 
 #[test]
+fn setup_rejects_base_url_with_query_or_fragment() {
+  // endpoints append paths to the base, so ?query or #fragment would
+  // corrupt every request the profile makes
+  let dir = tempfile::tempdir().unwrap();
+  for (bad, needle) in [
+    ("https://s.example.com/?utm=x", "query"),
+    ("https://s.example.com/#section", "fragment"),
+  ] {
+    let out = lonk()
+      .env("LONK_CONFIG_DIR", dir.path())
+      .args(["setup", bad])
+      .output()
+      .expect("run lonk setup");
+    assert_eq!(out.status.code(), Some(1), "accepted {bad}");
+    assert!(
+      String::from_utf8_lossy(&out.stderr).contains(needle),
+      "stderr for {bad} missing {needle:?}"
+    );
+    assert!(!dir.path().join("config.toml").exists(), "saved {bad}");
+  }
+}
+
+#[test]
+fn setup_accepts_base_url_with_path() {
+  // reverse-proxy subpath deployments are legitimate base urls
+  let dir = tempfile::tempdir().unwrap();
+  let out = lonk()
+    .env("LONK_CONFIG_DIR", dir.path())
+    .args(["setup", "https://example.com/lonk/"])
+    .output()
+    .expect("run lonk setup");
+  assert_eq!(out.status.code(), Some(0));
+  let cfg = read_config(dir.path());
+  assert!(
+    cfg.contains("base_url = \"https://example.com/lonk\""),
+    "{cfg}"
+  );
+}
+
+#[test]
 fn setup_without_url_and_without_tty_errors_with_hint() {
   let dir = tempfile::tempdir().unwrap();
   let out = lonk()

@@ -77,6 +77,20 @@ fn parse_headers(raw: &[String]) -> Result<Vec<(String, String)>, String> {
     .collect()
 }
 
+/// Validate a server base URL and normalize it for path-appending:
+/// endpoints are built as `{base}/api/links` etc., so a query string or
+/// fragment would corrupt every request the profile ever makes.
+fn normalize_base_url(raw: &str) -> Result<String, String> {
+  let parsed = lonk_core::validate_url(raw.trim()).map_err(|e| e.to_string())?;
+  if parsed.query().is_some() {
+    return Err("base url must not contain a query string".to_string());
+  }
+  if parsed.fragment().is_some() {
+    return Err("base url must not contain a fragment".to_string());
+  }
+  Ok(parsed.as_str().trim_end_matches('/').to_string())
+}
+
 fn run_setup(base_url: Option<String>, profile: &str) -> i32 {
   let raw = match base_url.or_else(prompt_base_url) {
     Some(url) => url,
@@ -86,14 +100,13 @@ fn run_setup(base_url: Option<String>, profile: &str) -> i32 {
       return EXIT_USAGE;
     }
   };
-  let parsed = match lonk_core::validate_url(raw.trim()) {
-    Ok(u) => u,
+  let base = match normalize_base_url(&raw) {
+    Ok(base) => base,
     Err(e) => {
       eprintln!("{e}");
       return EXIT_USAGE;
     }
   };
-  let base = parsed.as_str().trim_end_matches('/').to_string();
 
   let path = config::config_path();
   let mut cfg = match config::Config::load(&path) {
@@ -202,9 +215,8 @@ fn resolve_base_url(profile: Option<&str>) -> Result<String, i32> {
   }
   // default profile missing: one-time interactive setup on a TTY
   match prompt_base_url() {
-    Some(raw) => match lonk_core::validate_url(raw.trim()) {
-      Ok(parsed) => {
-        let base = parsed.as_str().trim_end_matches('/').to_string();
+    Some(raw) => match normalize_base_url(&raw) {
+      Ok(base) => {
         cfg.profiles.insert(
           "default".into(),
           config::Profile {
