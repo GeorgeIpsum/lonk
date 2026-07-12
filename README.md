@@ -14,12 +14,33 @@ set `LONK_DB` to override the path.
 
 ### API
 
-| Endpoint          | Description                                               |
-| ----------------- | --------------------------------------------------------- |
-| `POST /api/links` | `{"url": "https://…"}` → `201` with `{id, url, short_url, qr_url}` |
-| `POST /api/valid` | `{"url": "…"}` → `200` with `{valid: true}` or `{valid: false, error}` |
-| `GET /<id>`       | `303` redirect to the original URL                         |
-| `GET /<id>/qr`    | SVG QR code for the short link                             |
+| Endpoint            | Description                                               |
+| ------------------- | --------------------------------------------------------- |
+| `POST /api/links`   | `{"url": "https://…", "headers": [["Name","value"], …]}` → `201` with `{id, url, short_url, qr_url, headers}` (`headers` optional, max 16 pairs) |
+| `POST /api/valid`   | `{"url": "…"}` → `200` with `{valid: true}` or `{valid: false, error}` |
+| `GET /<id>`         | `303` redirect to the original URL, carrying the link's custom response headers |
+| `GET /<id>/qr`      | SVG QR code for the short link                             |
+| `GET /<id>/status`  | Live dead-link check → `200` with `{id, url, alive, http_status?, error?}`; `404` if the slug is unknown |
+
+### Custom response headers
+
+Headers stored on a link are attached to the **303 redirect response** —
+they are not (and cannot be) injected into the request your browser then
+makes to the destination. Useful values: `Set-Cookie` (cookie on the lonk
+domain), `Cache-Control` (redirect cacheability), `Referrer-Policy`
+(e.g. `no-referrer` strips the Referer sent onward), `X-*` for
+proxies/middleware. Structural headers (`Location`, `Content-Length`,
+`Transfer-Encoding`, `Connection`, `Content-Type`, `Content-Encoding`)
+are rejected.
+
+### Dead-link checks
+
+`GET /<id>/status` makes the server probe the stored destination (HEAD,
+falling back to GET on 405/501, up to 5 redirects, 5s timeout); the
+destination is alive when the final response is 2xx. Note: this means
+anyone who can reach your lonkd can make it issue requests to stored
+URLs and see whether they answered — on a self-hosted instance this is
+the same trust level as creating links.
 
 ## Upgrading from pre-CLI versions
 
@@ -56,6 +77,10 @@ lonk https://example.com/some/very/long/url
 lonk --qr https://example.com/a      # + scannable QR in the terminal
 lonk --qr-svg https://example.com/a > code.svg
 lonk --valid https://maybe.example   # local validation only, no network
+lonk -H "Set-Cookie: seen=1; Path=/" -H "Cache-Control: no-store" https://example.com/a
+lonk status Ab3dEf9                        # or: lonk status https://s.example.com/Ab3dEf9
+                                           # prints "alive (200)" / "dead (404)" / "dead (<error>)"
+                                           # exit 0 alive · 1 dead/unknown · 2 server unreachable
 ```
 
 Profiles let you target several servers:
@@ -70,6 +95,10 @@ invalid URL or failed request aborts the run (exit 1 for validation/usage
 errors, exit 2 for network/server errors).
 
 ## Development
+
+The workspace has three crates: `crates/lonk-core` (validation + wire
+types), `crates/lonkd` (the server), `crates/lonk-cli` (the `lonk`
+binary — install with `cargo install --path crates/lonk-cli`).
 
 ```bash
 cargo test --workspace                # unit + integration tests
