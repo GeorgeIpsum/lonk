@@ -845,7 +845,7 @@ name = "lonk"
 version = "0.1.0"
 dependencies = [
  "clap",
- "lonk-validate",
+ "lonk-core",
  "qrcode",
  "rand",
  "rocket",
@@ -858,7 +858,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "lonk-validate"
+name = "lonk-core"
 version = "0.1.0"
 dependencies = [
  "url",

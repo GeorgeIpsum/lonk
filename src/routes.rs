@@ -58,7 +58,7 @@ pub fn create_link(
   db: &State<Db>,
   body: Json<CreateReq>,
 ) -> Result<status::Created<Json<LinkResp>>, ApiError> {
-  let parsed = lonk_validate::validate_url(&body.url)
+  let parsed = lonk_core::validate_url(&body.url)
     .map_err(|e| api_error(Status::BadRequest, &e.to_string()))?;
   for _ in 0..8 {
     let id = gen_slug(7);
@@ -106,7 +106,7 @@ pub fn qr_svg(
 
 #[rocket::post("/api/valid", data = "<body>")]
 pub fn valid_url(body: Json<CreateReq>) -> Json<ValidResp> {
-  match lonk_validate::validate_url(&body.url) {
+  match lonk_core::validate_url(&body.url) {
     Ok(_) => Json(ValidResp {
       valid: true,
       error: None,

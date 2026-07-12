@@ -37,7 +37,7 @@ fn run(cli: Cli) -> i32 {
 fn run_valid(urls: &[String]) -> i32 {
   let mut ok = true;
   for url in urls {
-    match lonk_validate::validate_url(url) {
+    match lonk_core::validate_url(url) {
       Ok(_) => println!("valid"),
       Err(e) => {
         println!("invalid: {e}");
@@ -64,7 +64,7 @@ fn run_setup(base_url: Option<String>, profile: &str) -> i32 {
       return EXIT_USAGE;
     }
   };
-  let parsed = match lonk_validate::validate_url(raw.trim()) {
+  let parsed = match lonk_core::validate_url(raw.trim()) {
     Ok(u) => u,
     Err(e) => {
       eprintln!("{e}");
@@ -120,7 +120,7 @@ fn run_shorten(cli: &Cli) -> i32 {
 
   // 1. local validation, fail fast before any network traffic
   for url in &cli.urls {
-    if let Err(e) = lonk_validate::validate_url(url) {
+    if let Err(e) = lonk_core::validate_url(url) {
       eprintln!("{url}: {e}");
       return EXIT_USAGE;
     }
@@ -171,7 +171,7 @@ fn resolve_base_url(profile: Option<&str>) -> Result<String, i32> {
   }
   // default profile missing: one-time interactive setup on a TTY
   match prompt_base_url() {
-    Some(raw) => match lonk_validate::validate_url(raw.trim()) {
+    Some(raw) => match lonk_core::validate_url(raw.trim()) {
       Ok(parsed) => {
         let base = parsed.as_str().trim_end_matches('/').to_string();
         cfg.profiles.insert(

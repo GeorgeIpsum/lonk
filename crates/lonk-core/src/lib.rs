@@ -2,6 +2,8 @@ use std::fmt;
 
 pub use url::Url;
 
+pub mod paths;
+
 #[derive(Debug, PartialEq, Eq)]
 pub enum ValidateError {
   Parse(String),
