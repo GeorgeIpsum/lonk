@@ -2,6 +2,7 @@ use qrcode::render::svg;
 use qrcode::QrCode;
 use rocket::http::uri::Host;
 use rocket::http::{ContentType, Status};
+use rocket::request::FromParam;
 use rocket::response::status;
 use rocket::serde::json::Json;
 use rocket::serde::Serialize;
@@ -92,9 +93,31 @@ pub fn create_link(
   ))
 }
 
+/// A single path segment that looks like a link id (never contains `.`),
+/// as opposed to a static asset filename (`index.html`, `extra.css`, ...).
+///
+/// Generated slugs are alphanumeric only (see `gen_slug`), so a `.` can never
+/// appear in a real id. Rejecting here makes Rocket forward requests for
+/// dotted single-segment paths (e.g. `favicon.ico`) past this route to the
+/// next matching one - the embedded/override web asset catch-all - instead
+/// of this route swallowing them with a "no such link" 404.
+pub struct LinkId<'r>(pub &'r str);
+
+impl<'r> FromParam<'r> for LinkId<'r> {
+  type Error = &'r str;
+
+  fn from_param(param: &'r str) -> Result<Self, Self::Error> {
+    if param.contains('.') {
+      Err(param)
+    } else {
+      Ok(LinkId(param))
+    }
+  }
+}
+
 #[rocket::get("/<id>")]
-pub fn follow_link(db: &State<Db>, id: &str) -> Result<RedirectWithHeaders, ApiError> {
-  match db.get_link(id).map_err(db_error)? {
+pub fn follow_link(db: &State<Db>, id: LinkId<'_>) -> Result<RedirectWithHeaders, ApiError> {
+  match db.get_link(id.0).map_err(db_error)? {
     Some((url, headers)) => Ok(RedirectWithHeaders {
       location: url,
       headers,
