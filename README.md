@@ -2,6 +2,8 @@
 
 Self-hosted link shortener with REST API + QR code generation.
 
+**[Full guide](https://georgeipsum.github.io/lonk/)** — API reference, CLI, custom headers, deployment.
+
 ## Server (`lonkd`)
 
 ```bash
