@@ -2,7 +2,7 @@ use qrcode::render::svg;
 use qrcode::QrCode;
 use rocket::http::uri::Host;
 use rocket::http::{ContentType, Status};
-use rocket::response::{status, Redirect};
+use rocket::response::status;
 use rocket::serde::json::Json;
 use rocket::serde::Serialize;
 use rocket::State;
@@ -31,20 +31,56 @@ fn db_error(_: rusqlite::Error) -> ApiError {
   api_error(Status::InternalServerError, "database error")
 }
 
+/// 303 redirect that also carries a link's stored custom response headers.
+pub struct RedirectWithHeaders {
+  location: String,
+  headers: Vec<(String, String)>,
+}
+
+impl<'r> rocket::response::Responder<'r, 'static> for RedirectWithHeaders {
+  fn respond_to(self, _req: &'r rocket::Request<'_>) -> rocket::response::Result<'static> {
+    let mut builder = rocket::Response::build();
+    builder
+      .status(Status::SeeOther)
+      .raw_header("Location", self.location);
+    for (name, value) in self.headers {
+      builder.header_adjoin(rocket::http::Header::new(name, value));
+    }
+    Ok(builder.finalize())
+  }
+}
+
 #[rocket::post("/api/links", data = "<body>")]
 pub fn create_link(
   db: &State<Db>,
   body: Json<CreateLinkReq>,
 ) -> Result<status::Created<Json<LinkResp>>, ApiError> {
+  let body = body.into_inner();
   let parsed = lonk_core::validate_url(&body.url)
     .map_err(|e| api_error(Status::BadRequest, &e.to_string()))?;
+  if body.headers.len() > lonk_core::MAX_HEADERS_PER_LINK {
+    return Err(api_error(
+      Status::BadRequest,
+      &format!("too many headers (max {})", lonk_core::MAX_HEADERS_PER_LINK),
+    ));
+  }
+  for (name, value) in &body.headers {
+    lonk_core::validate_header(name, value)
+      .map_err(|e| api_error(Status::BadRequest, &e.to_string()))?;
+  }
+  let headers_json = serde_json::to_string(&body.headers)
+    .map_err(|_| api_error(Status::InternalServerError, "header encoding failed"))?;
   for _ in 0..8 {
     let id = gen_slug(7);
-    if db.insert(&id, parsed.as_str(), "[]").map_err(db_error)? {
+    if db
+      .insert(&id, parsed.as_str(), &headers_json)
+      .map_err(db_error)?
+    {
       let resp = LinkResp {
         short_url: format!("/{id}"),
         qr_url: format!("/{id}/qr"),
         url: parsed.into(),
+        headers: body.headers.clone(),
         id,
       };
       return Ok(status::Created::new(resp.short_url.clone()).body(Json(resp)));
@@ -57,9 +93,12 @@ pub fn create_link(
 }
 
 #[rocket::get("/<id>")]
-pub fn follow_link(db: &State<Db>, id: &str) -> Result<Redirect, ApiError> {
-  match db.get_url(id).map_err(db_error)? {
-    Some(url) => Ok(Redirect::to(url)),
+pub fn follow_link(db: &State<Db>, id: &str) -> Result<RedirectWithHeaders, ApiError> {
+  match db.get_link(id).map_err(db_error)? {
+    Some((url, headers)) => Ok(RedirectWithHeaders {
+      location: url,
+      headers,
+    }),
     None => Err(api_error(Status::NotFound, "no such link")),
   }
 }
