@@ -185,8 +185,8 @@ Decisions (with the user): **plain markdown + Jekyll** (no local doc
 toolchain — GitHub's builder renders it), deployed by a **GitHub Actions
 workflow** (the repo's first CI file).
 
-- Content lives in `docs/guide/` — deliberately a subdirectory, so the
-  internal planning docs in `docs/superpowers/` are never published.
+- Content lives in `docs/guide/` — internal planning docs live in the
+  top-level `plans/` directory (per CLAUDE.md) and are never published.
 - Pages (each starts with a small front-matter block and a one-line nav
   linking back to the index; Pages' built-in themes have no sidebar):
   - `index.md` — what lonk is, quick start (server + CLI in five commands)
