@@ -222,3 +222,10 @@ fn create_link_rejects_too_many_headers() {
   let body: serde_json::Value = res.into_json().expect("json body");
   assert!(body["error"].as_str().unwrap().contains("max 16"));
 }
+
+#[test]
+fn status_unknown_id_is_404() {
+  let client = client();
+  let res = client.get("/zzzzzzz/status").dispatch();
+  assert_eq!(res.status(), Status::NotFound);
+}

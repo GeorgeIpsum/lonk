@@ -8,7 +8,7 @@ use rocket::serde::Serialize;
 use rocket::State;
 
 use crate::db::{gen_slug, Db};
-use lonk_core::types::{CreateLinkReq, LinkResp, ValidResp};
+use lonk_core::types::{CreateLinkReq, LinkResp, StatusResp, ValidResp};
 
 #[derive(Serialize)]
 #[serde(crate = "rocket::serde")]
@@ -133,6 +133,45 @@ pub fn valid_url(body: Json<CreateLinkReq>) -> Json<ValidResp> {
       error: Some(e.to_string()),
     }),
   }
+}
+
+/// Live destination check: (alive, final http status if any, transport error if any).
+/// HEAD with a one-shot GET retry on 405/501; <=5 redirects; 5s timeout; alive = final 2xx.
+fn check_destination(url: &str) -> (bool, Option<u16>, Option<String>) {
+  let agent = ureq::AgentBuilder::new()
+    .redirects(5)
+    .timeout(std::time::Duration::from_secs(5))
+    .build();
+  let result = match agent.head(url).call() {
+    Err(ureq::Error::Status(405 | 501, _)) => agent.get(url).call(),
+    other => other,
+  };
+  match result {
+    Ok(resp) => (resp.status() / 100 == 2, Some(resp.status()), None),
+    Err(ureq::Error::Status(code, _)) => (false, Some(code), None),
+    Err(ureq::Error::Transport(t)) => (false, None, Some(t.to_string())),
+  }
+}
+
+#[rocket::get("/<id>/status")]
+pub async fn link_status(db: &State<Db>, id: &str) -> Result<Json<StatusResp>, ApiError> {
+  let url = match db.get_url(id).map_err(db_error)? {
+    Some(url) => url,
+    None => return Err(api_error(Status::NotFound, "no such link")),
+  };
+  let check_url = url.clone();
+  // ureq is blocking; keep the 5s worst case off Rocket's async workers.
+  let (alive, http_status, error) =
+    rocket::tokio::task::spawn_blocking(move || check_destination(&check_url))
+      .await
+      .map_err(|_| api_error(Status::InternalServerError, "status check failed"))?;
+  Ok(Json(StatusResp {
+    id: id.to_string(),
+    url,
+    alive,
+    http_status,
+    error,
+  }))
 }
 
 /// "https" when a proxy says so via X-Forwarded-Proto, else "http".

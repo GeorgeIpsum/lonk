@@ -23,6 +23,17 @@ pub struct ValidResp {
   pub error: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq)]
+pub struct StatusResp {
+  pub id: String,
+  pub url: String,
+  pub alive: bool,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub http_status: Option<u16>,
+  #[serde(skip_serializing_if = "Option::is_none")]
+  pub error: Option<String>,
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -61,5 +72,19 @@ mod tests {
       req.headers,
       vec![("Set-Cookie".to_string(), "a=1".to_string())]
     );
+  }
+
+  #[test]
+  fn status_resp_omits_absent_fields() {
+    let json = serde_json::to_string(&StatusResp {
+      id: "a".into(),
+      url: "https://e.com/".into(),
+      alive: false,
+      http_status: None,
+      error: Some("connect timeout".into()),
+    })
+    .unwrap();
+    assert!(!json.contains("http_status"));
+    assert!(json.contains("connect timeout"));
   }
 }
