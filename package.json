@@ -1,8 +1,8 @@
 {
   "name": "lonk-workspace",
   "private": true,
-  "workspaces": ["packages/lonk-client", "e2e"],
+  "workspaces": ["packages/lonk-client", "web", "e2e"],
   "scripts": {
-    "build": "npm -w lonk-client run build"
+    "build": "npm -w lonk-client run build && npm -w web run build"
   }
 }

@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>lonk</title>
+</head>
+<body>
+  <h1>lonk</h1>
+  <p>Paste a long URL, get a short one — with a QR code.</p>
+  <form id="form">
+    <input type="url" id="url" placeholder="https://example.com/very/long/url" required>
+    <button type="submit">Shorten</button>
+  </form>
+  <p id="error" role="alert" hidden></p>
+  <section id="result" hidden>
+    <a id="short" href=""></a>
+    <button id="copy" type="button">Copy</button>
+    <img id="qr" alt="QR code for the short link" width="256" height="256">
+  </section>
+  <details id="advanced">
+    <summary>Advanced: response headers</summary>
+    <p class="hint">Sent with the 303 redirect response (e.g. Set-Cookie, Cache-Control, Referrer-Policy) — not to the destination.</p>
+    <div id="headers"></div>
+    <button id="add-header" type="button">Add header</button>
+  </details>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
