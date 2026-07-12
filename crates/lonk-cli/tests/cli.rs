@@ -147,3 +147,31 @@ fn setup_preserves_other_profiles() {
     "{cfg}"
   );
 }
+
+#[test]
+fn invalid_header_flag_fails_fast_without_config() {
+  let dir = tempfile::tempdir().unwrap();
+  // no colon at all
+  let out = lonk()
+    .env("LONK_CONFIG_DIR", dir.path())
+    .args(["-H", "no-colon-here", "https://example.com/x"])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(1));
+  assert!(String::from_utf8_lossy(&out.stderr).contains("expected"));
+
+  // denylisted header, rejected locally before any config/network use
+  let out = lonk()
+    .env("LONK_CONFIG_DIR", dir.path())
+    .args([
+      "-H",
+      "Location: https://evil.example",
+      "https://example.com/x",
+    ])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(1));
+  assert!(String::from_utf8_lossy(&out.stderr).contains("not allowed"));
+  // config dir untouched proves fail-fast happened before setup/prompt logic
+  assert!(!dir.path().join("config.toml").exists());
+}

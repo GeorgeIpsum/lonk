@@ -55,6 +55,27 @@ fn run_valid(urls: &[String]) -> i32 {
 use std::io::IsTerminal;
 use std::io::Write;
 
+/// Parse and validate repeatable -H "Name: value" flags.
+fn parse_headers(raw: &[String]) -> Result<Vec<(String, String)>, String> {
+  if raw.len() > lonk_core::MAX_HEADERS_PER_LINK {
+    return Err(format!(
+      "too many headers (max {})",
+      lonk_core::MAX_HEADERS_PER_LINK
+    ));
+  }
+  raw
+    .iter()
+    .map(|h| {
+      let (name, value) = h
+        .split_once(':')
+        .ok_or_else(|| format!("invalid header {h:?}: expected \"Name: value\""))?;
+      let (name, value) = (name.trim().to_string(), value.trim().to_string());
+      lonk_core::validate_header(&name, &value).map_err(|e| e.to_string())?;
+      Ok((name, value))
+    })
+    .collect()
+}
+
 fn run_setup(base_url: Option<String>, profile: &str) -> i32 {
   let raw = match base_url.or_else(prompt_base_url) {
     Some(url) => url,
@@ -118,7 +139,16 @@ fn run_shorten(cli: &Cli) -> i32 {
     return EXIT_USAGE;
   }
 
-  // 1. local validation, fail fast before any network traffic
+  // 1. parse and validate headers, fail fast before any network traffic
+  let headers = match parse_headers(&cli.headers) {
+    Ok(h) => h,
+    Err(e) => {
+      eprintln!("{e}");
+      return EXIT_USAGE;
+    }
+  };
+
+  // 2. local validation, fail fast before any network traffic
   for url in &cli.urls {
     if let Err(e) = lonk_core::validate_url(url) {
       eprintln!("{url}: {e}");
@@ -130,15 +160,15 @@ fn run_shorten(cli: &Cli) -> i32 {
     return EXIT_USAGE;
   }
 
-  // 2. resolve base url from profile
+  // 3. resolve base url from profile
   let base = match resolve_base_url(cli.profile.as_deref()) {
     Ok(b) => b,
     Err(code) => return code,
   };
 
-  // 3. shorten in input order, fail fast
+  // 4. shorten in input order, fail fast
   for (i, url) in cli.urls.iter().enumerate() {
-    match shorten_one(&base, url) {
+    match shorten_one(&base, url, &headers) {
       Ok(short) => {
         if i > 0 && cli.qr {
           println!();
@@ -199,9 +229,16 @@ fn resolve_base_url(profile: Option<&str>) -> Result<String, i32> {
 }
 
 /// POST one url; Ok(full short url), Err((exit code, message)).
-fn shorten_one(base: &str, url: &str) -> Result<String, (i32, String)> {
+fn shorten_one(
+  base: &str,
+  url: &str,
+  headers: &[(String, String)],
+) -> Result<String, (i32, String)> {
   let resp = ureq::post(&format!("{base}/api/links"))
-    .send_json(serde_json::json!({ "url": url }))
+    .send_json(&lonk_core::types::CreateLinkReq {
+      url: url.to_string(),
+      headers: headers.to_vec(),
+    })
     .map_err(|e| match e {
       ureq::Error::Status(code, resp) => {
         let msg = resp

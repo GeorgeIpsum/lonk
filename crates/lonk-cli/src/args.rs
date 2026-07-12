@@ -27,6 +27,10 @@ pub struct Cli {
   #[arg(long, global = true, value_name = "NAME")]
   pub profile: Option<String>,
 
+  /// Custom response header for the created link(s), "Name: value" (repeatable)
+  #[arg(short = 'H', long = "header", value_name = "NAME: VALUE")]
+  pub headers: Vec<String>,
+
   #[command(subcommand)]
   pub cmd: Option<Cmd>,
 }
@@ -77,5 +81,19 @@ mod tests {
       err.kind(),
       clap::error::ErrorKind::DisplayHelpOnMissingArgumentOrSubcommand
     );
+  }
+
+  #[test]
+  fn parses_repeated_headers() {
+    let cli = Cli::try_parse_from([
+      "lonk",
+      "-H",
+      "X-A: 1",
+      "--header",
+      "X-B: 2",
+      "https://a.example",
+    ])
+    .unwrap();
+    assert_eq!(cli.headers, vec!["X-A: 1", "X-B: 2"]);
   }
 }

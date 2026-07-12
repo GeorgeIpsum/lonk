@@ -9,6 +9,7 @@ use std::time::{Duration, Instant};
 // letting the test pass by luck against the wrong server/DB.
 const PORT_END_TO_END: u16 = 8907;
 const PORT_TRAILING_SLASH: u16 = 8908;
+const PORT_HEADERS: u16 = 8909;
 
 struct ServerGuard(Child);
 
@@ -235,4 +236,49 @@ fn shorten_with_server_down_is_exit_2() {
     .output()
     .unwrap();
   assert_eq!(out.status.code(), Some(2));
+}
+
+#[test]
+fn shorten_with_headers_end_to_end() {
+  let tmp = tempfile::tempdir().unwrap();
+  let _server = start_server(tmp.path(), PORT_HEADERS);
+  let base = base(PORT_HEADERS);
+
+  let out = lonk_with_config(tmp.path())
+    .args(["setup", &base])
+    .output()
+    .unwrap();
+  assert_eq!(out.status.code(), Some(0));
+
+  let out = lonk_with_config(tmp.path())
+    .args([
+      "-H",
+      "X-Demo: 1",
+      "-H",
+      "Set-Cookie: a=1",
+      "-H",
+      "Set-Cookie: b=2",
+      "https://example.com/with-headers",
+    ])
+    .output()
+    .unwrap();
+  assert_eq!(
+    out.status.code(),
+    Some(0),
+    "stderr: {}",
+    String::from_utf8_lossy(&out.stderr)
+  );
+  let stdout = String::from_utf8_lossy(&out.stdout);
+  let short = stdout.lines().next().unwrap();
+
+  let resp = ureq::AgentBuilder::new()
+    .redirects(0)
+    .build()
+    .get(short)
+    .call()
+    .expect("GET short link");
+  assert_eq!(resp.status(), 303);
+  assert_eq!(resp.header("X-Demo"), Some("1"));
+  let cookies: Vec<&str> = resp.all("Set-Cookie");
+  assert_eq!(cookies, vec!["a=1", "b=2"]);
 }
