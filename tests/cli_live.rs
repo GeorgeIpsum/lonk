@@ -19,8 +19,22 @@ impl Drop for ServerGuard {
   }
 }
 
+fn lonkd_bin() -> std::path::PathBuf {
+  // test executables live in target/debug/deps/; the workspace's binaries in target/debug/
+  let mut dir = std::env::current_exe().expect("test exe path");
+  dir.pop(); // deps/
+  dir.pop(); // debug/
+  let bin = dir.join(format!("lonkd{}", std::env::consts::EXE_SUFFIX));
+  assert!(
+    bin.exists(),
+    "lonkd binary not found at {} - run: cargo test --workspace (or cargo build -p lonkd)",
+    bin.display()
+  );
+  bin
+}
+
 fn start_server(dbdir: &std::path::Path, port: u16) -> ServerGuard {
-  let child = Command::new(env!("CARGO_BIN_EXE_lonkd"))
+  let child = Command::new(lonkd_bin())
     .env("LONK_DB", dbdir.join("live.db"))
     .env("ROCKET_ADDRESS", "127.0.0.1")
     .env("ROCKET_PORT", port.to_string())

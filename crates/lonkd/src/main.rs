@@ -5,5 +5,5 @@ fn rocket() -> _ {
     std::fs::create_dir_all(&dir).expect("failed to create config dir");
     dir.join("lonk.db").to_string_lossy().into_owned()
   });
-  lonk::rocket_app(&db_path)
+  lonkd::rocket_app(&db_path)
 }

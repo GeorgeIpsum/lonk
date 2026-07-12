@@ -847,9 +847,6 @@ dependencies = [
  "clap",
  "lonk-core",
  "qrcode",
- "rand",
- "rocket",
- "rusqlite",
  "serde",
  "serde_json",
  "tempfile",
@@ -864,6 +861,18 @@ dependencies = [
  "serde",
  "serde_json",
  "url",
+]
+
+[[package]]
+name = "lonkd"
+version = "0.1.0"
+dependencies = [
+ "lonk-core",
+ "qrcode",
+ "rand",
+ "rocket",
+ "rusqlite",
+ "serde_json",
 ]
 
 [[package]]

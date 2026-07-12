@@ -2,7 +2,7 @@ use rocket::http::{ContentType, Header, Status};
 use rocket::local::blocking::Client;
 
 fn client() -> Client {
-  Client::tracked(lonk::rocket_app(":memory:")).expect("valid rocket instance")
+  Client::tracked(lonkd::rocket_app(":memory:")).expect("valid rocket instance")
 }
 
 #[test]
