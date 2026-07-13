@@ -22,6 +22,7 @@ export default defineConfig({
         timeout: 180_000,
         env: {
           ...process.env,
+          LONK_WEB_DIR: '',
           LONK_DB: tmpDb,
           ROCKET_ADDRESS: '127.0.0.1',
           ROCKET_PORT: String(PORT),

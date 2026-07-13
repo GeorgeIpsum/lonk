@@ -2,6 +2,8 @@
 
 Self-hosted link shortener with REST API + QR code generation.
 
+**[Full guide](https://georgeipsum.github.io/lonk/)** — API reference, CLI, custom headers, deployment.
+
 ## Server (`lonkd`)
 
 ```bash
@@ -76,7 +78,41 @@ types), `crates/lonkd` (the server), `crates/lonk-cli` (the `lonk`
 binary — install with `cargo install --path crates/lonk-cli`).
 
 ```bash
-cargo test --workspace                # unit + integration tests
-cd e2e && npm install && npm test     # Playwright e2e (spawns lonkd)
+npm install && npm run build               # build lonk-client + the web UI (required before cargo)
+cargo test --workspace                     # unit + integration tests
+cd e2e && npm test                         # Playwright e2e (builds the UI, spawns lonkd)
 cd e2e && BASE_URL=https://s.example.com npm test   # against a deployed instance
 ```
+
+Building `lonkd` requires `web/dist` to exist — `build.rs` fails with the
+command to run if it doesn't. Cargo never invokes npm itself.
+
+## Running as a daemon
+
+Build once, deploy one file — the web UI is embedded in the binary:
+
+```bash
+npm install && npm run build
+cargo build --release
+```
+
+- **Linux (systemd):** see `deploy/lonkd.service` (install commands in its header).
+- **macOS (launchd):** see `deploy/com.lonk.lonkd.plist` (starts at boot; header
+  notes the login-time LaunchAgent alternative).
+
+Both files show `LONK_WEB_DIR` (serve your own UI) and `ROCKET_ADDRESS`
+(bind beyond localhost) as commented-out options.
+
+## Hacking on the UI
+
+The bundled UI lives in `web/` (Vite + TypeScript) and calls the API through
+`packages/lonk-client`. Hot-reload development against a running server:
+
+```bash
+cargo run --bin lonkd          # API on :8000
+npm -w web run dev             # UI on :5173, /api and short links proxied
+```
+
+To serve a **bespoke UI without rebuilding anything**, point `LONK_WEB_DIR`
+at any directory with an `index.html`; `lonk-client` gives you typed API
+calls (`createClient().createLink({ url })`, `validateUrl`, `linkStatus`).

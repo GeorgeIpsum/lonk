@@ -1,0 +1,13 @@
+body { font-family: system-ui, sans-serif; max-width: 40rem; margin: 4rem auto; padding: 0 1rem; }
+form { display: flex; gap: 0.5rem; }
+input[type="url"] { flex: 1; padding: 0.5rem; font-size: 1rem; }
+button { padding: 0.5rem 1rem; font-size: 1rem; cursor: pointer; }
+#result { margin-top: 2rem; }
+#result a { font-size: 1.25rem; word-break: break-all; }
+#qr { display: block; margin-top: 1rem; }
+#error { color: #b00020; }
+[hidden] { display: none; }
+#advanced { margin-top: 1rem; }
+#advanced .hint { font-size: 0.85rem; color: #666; }
+.header-row { display: flex; gap: 0.5rem; margin-bottom: 0.5rem; }
+.header-row input { flex: 1; padding: 0.35rem; }
