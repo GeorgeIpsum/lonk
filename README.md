@@ -1,6 +1,6 @@
 # lonk
 
-Self-hosted link shortener with REST API + QR code generation.
+Self-hosted link shortener with REST API, QR code generation, and CLI.
 
 **[Full guide](https://georgeipsum.github.io/lonk/)** — API reference, CLI, custom headers, deployment.
 
