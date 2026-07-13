@@ -1,0 +1,24 @@
+# lonk server as a systemd service.
+# Install:
+#   sudo cp target/release/lonkd /usr/local/bin/lonkd
+#   sudo cp deploy/lonkd.service /etc/systemd/system/lonkd.service
+#   sudo systemctl enable --now lonkd
+[Unit]
+Description=lonk link shortener
+After=network.target
+
+[Service]
+ExecStart=/usr/local/bin/lonkd
+Environment=LONK_DB=/var/lib/lonk/lonk.db
+# Bind beyond localhost only if you accept that /<id>/status lets anyone who
+# can reach lonkd probe stored URLs (see the README's dead-link-checks note):
+#Environment=ROCKET_ADDRESS=0.0.0.0
+Environment=ROCKET_PORT=8000
+# Serve a bespoke UI from disk instead of the embedded one:
+#Environment=LONK_WEB_DIR=/var/lib/lonk/web
+DynamicUser=yes
+StateDirectory=lonk
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

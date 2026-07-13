@@ -1,0 +1,4 @@
+title: lonk
+description: Self-hosted link shortener with REST API, QR codes, and a CLI
+theme: jekyll-theme-cayman
+baseurl: "/lonk"

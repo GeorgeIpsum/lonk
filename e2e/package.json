@@ -1,0 +1,11 @@
+{
+  "name": "lonk-e2e",
+  "private": true,
+  "scripts": {
+    "pretest": "npm --prefix .. run build",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0"
+  }
+}
