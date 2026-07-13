@@ -4,7 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "predev": "npm --prefix ../packages/lonk-client run build",
     "dev": "vite",
+    "prebuild": "npm --prefix ../packages/lonk-client run build",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },
