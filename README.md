@@ -116,3 +116,20 @@ npm -w web run dev             # UI on :5173, /api and short links proxied
 To serve a **bespoke UI without rebuilding anything**, point `LONK_WEB_DIR`
 at any directory with an `index.html`; `lonk-client` gives you typed API
 calls (`createClient().createLink({ url })`, `validateUrl`, `linkStatus`).
+
+## Roadmap
+
+Deferred work is captured as pre-spec intent docs in
+[`plans/future/`](plans/future/) — each notes the trigger that would make it
+worth picking up:
+
+- **[SQLite connection pool](plans/future/sqlite-connection-pool.md)** —
+  replace the single mutex-guarded connection with a WAL pool for real
+  concurrent reads/writes. Trigger: measurable contention or multi-user load.
+- **[CLI polish](plans/future/cli-polish.md)** — small independent fixes
+  (`--version`, `--valid` empty-arg exit code, atomic config save).
+- **[Frontend & tooling hygiene](plans/future/frontend-and-tooling-hygiene.md)**
+  — client robustness and test-cleanup nits.
+- **[Untrusted-deployment hardening](plans/future/untrusted-multi-user-hardening.md)**
+  — SSRF/open-redirect/rate-limit/auth policy, needed only if lonk ever
+  serves link creators you don't trust.
