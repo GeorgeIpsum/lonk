@@ -1,0 +1,8 @@
+target
+node_modules
+web/dist
+web/node_modules
+packages/*/node_modules
+e2e/*
+!e2e/package.json
+.git
